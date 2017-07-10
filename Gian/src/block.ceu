@@ -1,0 +1,25 @@
+#define BLOCK_SIZE 100
+
+code/await Block (var int x, var int y, var int w) -> (var SDL_Rect collision) -> void do
+    collision = val SDL_Rect(x,y,w*BLOCK_SIZE,BLOCK_SIZE);
+    
+    every SDL_REDRAW do
+        var SDL_Rect draw_rect = collision;
+        draw_rect.x = draw_rect.x - outer.cameraX;
+        draw_rect.y = draw_rect.y - outer.cameraY;
+        _SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0x00,0x00,0x00,0xFF);
+        _SDL_RenderFillRect(&&outer.sdl!.ren, (&&draw_rect as _SDL_Rect&&));
+    end
+end
+
+code/await PseudoBlock (var int x, var int y) -> void do
+    var SDL_Rect collision = val SDL_Rect(x,y,BLOCK_SIZE,BLOCK_SIZE);
+    
+    every SDL_REDRAW do
+        var SDL_Rect draw_rect = collision;
+        draw_rect.x = draw_rect.x - outer.cameraX;
+        draw_rect.y = draw_rect.y - outer.cameraY;
+        _SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0x11,0x11,0xFF,0xFF);
+        _SDL_RenderFillRect(&&outer.sdl!.ren, (&&draw_rect as _SDL_Rect&&));
+    end
+end

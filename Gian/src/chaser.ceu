@@ -1,0 +1,287 @@
+#define CHASER_SIZE 60
+#define TRACE_DELAY 100
+#define COLLISION_DELAY 500
+#define APPEND_LIMIT 8
+#define CHASER_NO_OVERLAP 1
+
+code/await ChaserRef(void) 
+    -> (var u64 chID = 0, var SDL_Rect collision = val SDL_Rect(0,0, CHASER_SIZE, CHASER_SIZE), event void destroy) -> void do
+    await destroy;
+end
+pool[] ChaserRef cRefs;
+
+code/await Chaser (var int x, var int y) 
+    -> (var u64 chID = 0, var SDL_Rect collision, event (int, int) update_pf, event void collide_wait) 
+        -> void do
+    var&? Pathfinder pf = spawn Pathfinder(x/BLOCK_SIZE,y/BLOCK_SIZE,outer.endX,outer.endY);
+    var&? ChaserRef ref = spawn ChaserRef() in outer.cRefs;
+    chID = outer.chaserID;
+    ref!.chID = chID;
+    outer.chaserID = outer.chaserID + 1;
+    _printf("We have %d chasers.\n", outer.chaserID);
+
+    var int pathstep = 1;
+    var int appended = 0;
+    var int sx = x;
+    var int sy = y;
+    var int drawOffset = BLOCK_SIZE/2;
+
+    var int debugx = x;
+    var int debugy = y;
+
+    collision = val SDL_Rect(x - CHASER_SIZE/2, y - CHASER_SIZE/2, CHASER_SIZE, CHASER_SIZE);
+    
+    par/or do
+        var int dt;
+        every dt in SDL_DT do
+            var int v = 300 * dt/1000;
+            //Test line of sight
+            var bool lineOfSight = true;
+            var int losX;
+            var int losY;
+            losX = outer.player!.x;
+            losY = outer.player!.y;
+            var bool canMoveX = true;
+            var bool canMoveY = true;
+
+            var&? Block block;
+            
+            loop block in outer.blocks do
+                var int x1 = x; var int y1 = y;
+                var int x2 = outer.player!.x;
+                var int y2 = outer.player!.y;
+                if (_SDL_IntersectRectAndLine(&&block!.collision as _SDL_Rect&&, 
+                                                &&x1, &&y1, &&x2, &&y2) == _SDL_TRUE) then 
+                    lineOfSight = false; break;
+                end
+            end
+
+            /*
+            if (not lineOfSight) then 
+                var&? ChaserRef friend;
+                var bool canFollow = false;
+                loop friend in outer.cRefs do  
+                    if (chID<friend!.chID) then
+                        canFollow = true;
+                        loop block in outer.blocks do
+                            var int x1 = collision.x+(CHASER_SIZE>>1);
+                            var int y1 = collision.y+(CHASER_SIZE>>1);
+                            var int x2 = friend!.collision.x+(CHASER_SIZE>>1);
+                            var int y2 = friend!.collision.y+(CHASER_SIZE>>1);
+                            if (_SDL_IntersectRectAndLine(&&block!.collision as _SDL_Rect&&, 
+                                                            &&x1, &&y1, &&x2, &&y2) == _SDL_TRUE) then 
+                                canFollow = false;
+                                break;
+                            end
+                        end
+
+                        if (canFollow) then
+                            losX = friend!.collision.x+(CHASER_SIZE>>1);
+                            losY = friend!.collision.y+(CHASER_SIZE>>1);
+                            lineOfSight = true;
+                            break;
+                        end
+                    end
+                end
+            end*/
+
+            if (lineOfSight) then 
+                debugx = losX;
+                debugy = losY;
+
+                var int dx = losX - x;
+                var int dy = losY - y;
+
+                if (_abs(dx) >= v) then 
+                    x = x + _sign(dx)*v;
+                end 
+                if (_abs(dy) >= v) then 
+                    y = y + _sign(dy)*v;
+                end 
+                //_printf("LOS ON :))))\n");
+                pf!.path = [];
+                /*var int dd = (dx*dx + dy*dy)/100;
+                var int dcos = (dx*dx)/(dd);
+                var int dsin = (dy*dy)/(dd);
+
+                _printf("(X,Y) = (%d,%d); (DX,DY) = (%d,%d); (DCOS, DSIN) = (%d, %d)\n", x, y, dx, dy, dcos, dsin);
+                
+                x = x + ((_sign(dx) * dcos * v)/100);
+                y = y + ((_sign(dy) * dsin * v)/100);*/
+            else 
+            //Follow A* path instead
+                //_printf("LOS OFF DDDDDD: (Step: %d of %d)\n", pathstep, $pf!.path);
+                if (pathstep < $pf!.path) then
+                    var int target_x = pf!.path[pathstep].x; 
+                    var int target_y = pf!.path[pathstep].y; 
+
+                    var int dx = ((BLOCK_SIZE>>1) + target_x * BLOCK_SIZE) - x;
+                    var int dy = ((BLOCK_SIZE>>1) + target_y * BLOCK_SIZE) - y;
+
+                    if (_abs(dx) + _abs(dy) < v) then
+                        pathstep = pathstep + 1;
+                    else 
+                        if (_abs(dx) >= v) then 
+                            x = x + _sign(dx)*v;
+                        end 
+                        if (_abs(dy) >= v) then 
+                            y = y + _sign(dy)*v;
+                        end 
+                    end
+                else
+                    if ($pf!.path == 0) then
+                        appended = APPEND_LIMIT;
+                        emit update_pf(outer.player!.x/BLOCK_SIZE, outer.player!.y/BLOCK_SIZE);
+                    end
+                end
+            end 
+
+            var int prevLX = collision.x/BLOCK_SIZE;
+            var int prevRX = (collision.x+CHASER_SIZE)/BLOCK_SIZE;
+            var int nextLX = (x-(CHASER_SIZE>>1)-1)/BLOCK_SIZE;
+            var int nextRX = (x+(CHASER_SIZE>>1)+1)/BLOCK_SIZE;
+            var int gridTY = (collision.y)/BLOCK_SIZE;
+            var int gridBY = (collision.y+CHASER_SIZE)/BLOCK_SIZE;
+
+            //if (nextLX != prevLX) then
+                if (_world[nextLX + gridTY*_world_w] == 1 or
+                    _world[nextLX + gridBY*_world_w] == 1) then
+                    canMoveX = false;
+                end
+            //end 
+
+            //if (nextRX != prevRX) then
+                if (_world[nextRX + gridTY*_world_w] == 1 or
+                    _world[nextRX + gridBY*_world_w] == 1) then
+                    canMoveX = false;
+                end
+            //end
+
+            #ifdef CHASER_NO_OVERLAP
+            var&? ChaserRef cr;
+            loop cr in outer.cRefs do
+                if (cr!.chID > chID) then
+                    var SDL_Rect collision_shifted = collision;
+                    collision_shifted.x = x - CHASER_SIZE/2;
+                    if (call Intersects(&cr!.collision, &collision_shifted)) then 
+                        canMoveX = false;
+                        break;
+                    end
+                end 
+            end
+            #endif
+
+            var int prevUY = collision.y/BLOCK_SIZE;
+            var int prevDY = (collision.y+CHASER_SIZE)/BLOCK_SIZE;
+            var int nextUY = (y-(CHASER_SIZE>>1)-1)/BLOCK_SIZE;
+            var int nextDY = (y+(CHASER_SIZE>>1)+1)/BLOCK_SIZE;
+            var int gridLX = (collision.x)/BLOCK_SIZE;
+            var int gridRX = (collision.x+CHASER_SIZE)/BLOCK_SIZE;
+
+            //if (nextUY != prevUY) then
+                if (_world[gridLX + nextUY*_world_w] == 1 or
+                    _world[gridRX + nextUY*_world_w] == 1) then
+                    canMoveY = false;
+                end
+            //end 
+
+            //if (nextDY != prevDY) then
+                if (_world[gridLX + nextDY*_world_w] == 1 or
+                    _world[gridRX + nextDY*_world_w] == 1) then
+                    canMoveY = false;
+                end
+            //end
+
+            #ifdef CHASER_NO_OVERLAP
+            loop cr in outer.cRefs do
+                if (cr!.chID > chID) then
+                    var SDL_Rect collision_shifted = collision;
+                    collision_shifted.y = y - CHASER_SIZE/2;
+                    if (call Intersects(&cr!.collision, &collision_shifted)) then 
+                        canMoveY = false;
+                        break;
+                    end
+                end
+            end
+            #endif
+
+            if (canMoveX) then
+                collision.x = x - CHASER_SIZE/2;
+            else
+                x = collision.x + CHASER_SIZE/2;
+            end 
+            if (canMoveY) then
+                collision.y = y - CHASER_SIZE/2;
+            else
+                y = collision.y + CHASER_SIZE/2;
+            end 
+
+            ref!.collision = collision;
+        end
+    with
+        loop do
+            var int gx;
+            var int gy;
+            (gx, gy) = await update_pf;
+            if (appended < APPEND_LIMIT) then 
+                appended = appended + 1;
+                var PathNode newNode = val PathNode(gx, gy);
+                pf!.path = pf!.path .. [newNode];
+            else
+                emit pf!.do_retarget(x/BLOCK_SIZE,y/BLOCK_SIZE,gx,gy);
+                pathstep = 1;
+                await (TRACE_DELAY)ms;
+                appended = 0;
+            end
+        end 
+    with
+        every SDL_REDRAW do
+            var SDL_Rect draw_rect = collision;
+            draw_rect.x = draw_rect.x - outer.cameraX;
+            draw_rect.y = draw_rect.y - outer.cameraY;
+            _SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0xDD,0x00,0xDD,0xFF);
+            _SDL_RenderFillRect(&&outer.sdl!.ren, (&&draw_rect as _SDL_Rect&&));
+
+            /*_SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0x22,0x22,0x22,0xFF);
+            _SDL_RenderDrawLine(&&outer.sdl!.ren, 
+                                        x - outer.cameraX, 
+                                        y - outer.cameraY,
+                                        debugx - outer.cameraX, 
+                                        debugy - outer.cameraY);*/
+
+            /* DEBUG - DRAW PATH
+            if ($pf!.path > 0) then
+                var usize ui;
+                var PathNode currnode;
+                var PathNode nextnode = pf!.path[0];
+                loop ui in [1 -> $pf!.path[ do
+                    currnode = nextnode;
+                    nextnode = pf!.path[ui];
+                    _SDL_RenderDrawLine(&&outer.sdl!.ren, 
+                                        drawOffset + currnode.x * BLOCK_SIZE - outer.cameraX, 
+                                        drawOffset + currnode.y * BLOCK_SIZE - outer.cameraY,
+                                        drawOffset + nextnode.x * BLOCK_SIZE - outer.cameraX, 
+                                        drawOffset + nextnode.y * BLOCK_SIZE - outer.cameraY);
+                end
+            end
+
+            // DEBUG - DRAW LINE OF SIGHT
+            _SDL_RenderDrawLine(&&outer.sdl!.ren, 
+                                        x - outer.cameraX, 
+                                        y - outer.cameraY,
+                                        outer.player!.x - outer.cameraX, 
+                                        outer.player!.y - outer.cameraY);*/
+
+            /*if (intersect) then 
+                _SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0xFF,0x00,0x00,0xFF);
+            else 
+                _SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0x00,0x00,0xFF,0xFF);
+            end 
+            _SDL_RenderDrawLine(&&outer.sdl!.ren, 
+                                        x - outer.cameraX, 
+                                        y - outer.cameraY,
+                                        outer.player!.collision.x - outer.cameraX, 
+                                        outer.player!.collision.y - outer.cameraY);*/
+        end
+    end
+end

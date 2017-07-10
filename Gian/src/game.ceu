@@ -1,0 +1,188 @@
+#define CEU_SDL_MODE_FRAME (1000/60)
+#include "c.ceu"
+#include "sdl/sdl.ceu"
+#include "util.ceu"
+
+#define WINDOW_W 800
+#define WINDOW_H 600
+
+#define PI 3.1415926535897932
+
+native/pre do
+    #include "../include/AStar.c"
+    #include "../include/AStarGrid.c"
+end
+
+native _ASPath, _PathNode;
+
+native/nohold 
+    _SDL_GetKeyboardState,
+    _SDL_IntersectRectAndLine,
+    _ASPathCreate,
+    _ASPathGetCount,
+    _ASPathGetNode,
+    _loadWorld,
+    _sign,
+    _clamp;
+
+native/const
+    _SDL_SCANCODE_W,
+    _SDL_SCANCODE_A,
+    _SDL_SCANCODE_S,
+    _SDL_SCANCODE_D,
+    _SDL_SCANCODE_LEFT,
+    _SDL_SCANCODE_UP,
+    _SDL_SCANCODE_RIGHT,
+    _SDL_SCANCODE_DOWN;
+
+var&? SDL_Init sdl =
+    spawn SDL_Init("AStar Tests", WINDOW_W, WINDOW_H, SDL_Color(0xFF,0xFF,0xFF,0xFF));
+
+watching sdl do
+    _loadWorld("./res/level02.map");
+
+    native/const
+        _world, _world_w, _world_h, 
+        _zombies_x, _zombies_y, _zombies_count;
+
+    var int cameraX = 0;
+    var int cameraY = 0;
+    var int startX = 1;
+    var int startY = 1;
+    var int endX = 8;
+    var int endY = 2;
+    var u64 chaserID = 0;
+
+    #include "pathfinder.ceu"
+
+    #include "block.ceu"
+    pool[] Block blocks;
+    pool[] PseudoBlock bgblocks;
+
+    var int maxCameraX = _world_w * BLOCK_SIZE - WINDOW_W;
+    var int maxCameraY = _world_h * BLOCK_SIZE - WINDOW_H;
+
+    event void retracePaths;
+    #include "player.ceu"
+    var&? Player player;
+    player = spawn Player(endX * BLOCK_SIZE + (BLOCK_SIZE/2), endY * BLOCK_SIZE + (BLOCK_SIZE/2));
+
+    #include "chaser.ceu"
+    pool[] Chaser chasers;
+    event void respawn_chaser;
+
+    var int i;
+    var int j;
+    var int w=1;
+    _printf("%d x %d\n", _world_w, _world_h);
+    loop i in [0 -> _world_h[ do
+        loop j in [0 -> _world_w[ do
+            if (_world[j + (i * _world_w)] == 1) then
+                if (j<_world_w-1 and _world[j+1 + (i * _world_w)] == 1) then
+                    //Chain blocks together to reduce number of objs
+                    w = w+1;
+                else
+                    spawn Block((j-w+1)*BLOCK_SIZE, i*BLOCK_SIZE, w) in blocks;
+                    w = 1;
+                end 
+            end
+            if (_world[j + (i * _world_w)] == 10) then
+                spawn PseudoBlock(j*BLOCK_SIZE, i*BLOCK_SIZE) in bgblocks;
+            end
+            // { printf("%d ", world[@j + (@i * WORLD_W)]); }
+        end
+    end
+
+    loop i in [0 -> _zombies_count[ do
+        spawn Chaser(_zombies_x[i] * BLOCK_SIZE + (BLOCK_SIZE/2), _zombies_y[i] * BLOCK_SIZE + (BLOCK_SIZE/2)) in chasers;
+    end
+
+    par do 
+        loop do
+            await retracePaths;
+            var&? Chaser chaserA;
+            loop chaserA in chasers do
+                emit chaserA!.update_pf(player!.x/BLOCK_SIZE, player!.y/BLOCK_SIZE);
+                await 50ms;
+            end
+        end 
+    with
+        var int dt;
+        every dt in SDL_DT do
+            {const u8 *st = SDL_GetKeyboardState(0);}
+
+            if ( {st[SDL_SCANCODE_D]} != 0) then
+                cameraX = _clamp(cameraX + WINDOW_W, 0, maxCameraX);
+            end
+            if ( {st[SDL_SCANCODE_S]} != 0) then
+                cameraY = _clamp(cameraY + WINDOW_H, 0, maxCameraY);
+            end
+            if ( {st[SDL_SCANCODE_A]} != 0) then
+                cameraX = _clamp(cameraX - WINDOW_W, 0, maxCameraX);
+            end
+            if ( {st[SDL_SCANCODE_W]} != 0) then
+                cameraY = _clamp(cameraY - WINDOW_H, 0, maxCameraY);
+            end
+        end
+    end 
+
+    /*par do
+        loop do
+            
+            await respawn_chaser;
+        end
+    with 
+        loop do 
+            par/or do 
+                var _SDL_MouseMotionEvent&& m;
+                m = await SDL_MOUSEMOTION;
+                endX = (cameraX + m:x)/32; endY = (cameraY + m:y)/32;
+            with
+                var _SDL_MouseButtonEvent&& m;
+                m = await SDL_MOUSEBUTTONDOWN until (m:button==_SDL_BUTTON_LEFT);
+                startX = (cameraX + m:x)/32; startY = (cameraY + m:y)/32;       
+                emit respawn_chaser;       
+            end
+
+            var&? Chaser chaser;
+			loop chaser in chasers do
+                emit chaser!.update_pf;
+            end
+        end
+    with
+        every SDL_DT do
+            
+        end
+    with 
+        var int drawOffset = BLOCK_SIZE/2;
+        every SDL_REDRAW do
+            _SDL_SetRenderDrawColor(&&sdl!.ren, 0xFF,0x00,0x00, 0xFF);
+            _SDL_RenderDrawLine(&&sdl!.ren, startX * BLOCK_SIZE - cameraX, 
+                                            startY * BLOCK_SIZE - cameraY,
+                                            (startX+1) * BLOCK_SIZE - cameraX, 
+                                            (startY+1) * BLOCK_SIZE - cameraY);
+
+            _SDL_RenderDrawLine(&&sdl!.ren, startX * BLOCK_SIZE - cameraX,
+                                            (startY+1) * BLOCK_SIZE - cameraY, 
+                                            (startX+1) * BLOCK_SIZE - cameraX, 
+                                            startY * BLOCK_SIZE - cameraY);
+            if ($pf.path > 0) then
+                var usize ui;
+                var PathNode currnode;
+                var PathNode nextnode = pf.path[0];
+                loop ui in [1 -> $pf.path[ do
+                    currnode = nextnode;
+                    nextnode = pf.path[ui];
+                    _SDL_RenderDrawLine(&&sdl!.ren, 
+                                        drawOffset + currnode.x * BLOCK_SIZE - cameraX, 
+                                        drawOffset + currnode.y * BLOCK_SIZE - cameraY,
+                                        drawOffset + nextnode.x * BLOCK_SIZE - cameraX, 
+                                        drawOffset + nextnode.y * BLOCK_SIZE - cameraY);
+                end
+            end
+        end
+    end*/
+end
+
+escape 0;
+

@@ -1,0 +1,163 @@
+#include "sdl/sdl.ceu"
+#include "c.ceu"
+
+#define CEU_SDL_MODE_FRAME (1000/60)
+
+#define SCREEN_WIDTH 800
+#define SCREEN_HEIGHT 600
+
+#define LEVEL_WIDTH 1800
+#define LEVEL_HEIGHT 1600
+
+
+native/pre do
+	##include<math.h>
+end
+
+native _acos, _atan2;// _sin, _cos;
+native/nohold 
+    _SDL_RenderCopyEx,
+	_SDL_ShowCursor;
+	
+native/const 
+    _SDL_FLIP_NONE, 
+    _SDL_FLIP_VERTICAL,
+	_SDL_DISABLE;
+
+
+var&? SDL_Init sdl = spawn SDL_Init("Right 2 Live", SCREEN_WIDTH, SCREEN_HEIGHT, SDL_Color(0x00,0x00,0x00,0xFF));
+_SDL_ShowCursor(_SDL_DISABLE);
+
+#include "vecmath.ceu"
+#include "utils.ceu"
+
+
+watching sdl do
+
+	
+		
+	//EVENTS
+	event void zombieTouchPlayer;
+	event void playerDied;
+	
+	//SOUNDTRACK
+	var& SDL_Open_Sound snd_music = spawn SDL_Open_Sound("res/snds/soundtrack_bg2.wav");
+	_Mix_PlayChannel(-1, &&snd_music.sound, -1);
+	
+	//CAMERA
+	var SDL_Rect camera = val SDL_Rect( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT );
+	loop do
+	
+		//MAP
+		#include "floorblock.ceu"
+
+		pool[] ObstacleBlock roof;
+		pool[] FloorBlock floor;
+		
+		// SHOT
+		
+		#include "shot.ceu"
+		pool[] Shot shots;	
+		
+		//PLAYER
+		#include "player.ceu"
+		var& Player p = spawn Player(100.0, 100.0);
+
+		// ZOMBIE 
+		
+		#include "zombie.ceu"
+		pool[] Zombie zombies;
+		var int k;
+		loop k in [0 -> 10] do
+			spawn Zombie(300 + k * 100, 300+ 3*k, 3) in zombies;
+		end
+
+		
+		var int i;	
+		loop i in [0 -> 10] do
+			spawn ObstacleBlock(i,0, &tx_ROOF_EDGE, BL_EDGE_DOWN) in roof;
+		end
+
+		loop i in [0 -> 10] do
+			spawn FloorBlock(i,1,&tx_SIDEWALK_EDGE, BL_EDGE_DOWN) in floor;
+		end
+		loop i in [0 -> 10] do
+			var int j;
+			loop j in [1 -> 6] do
+				if(j >= 2) then
+					spawn FloorBlock(i,j,&tx_ASPHALT, 0) in floor;
+				end
+
+			end
+		end
+		loop i in [0 -> 10] do
+			spawn ObstacleBlock(i,8, &tx_CRATES, BL_EDGE_UP) in roof;
+		end
+
+		loop i in [0 -> 10] do
+			spawn FloorBlock(i,7,&tx_SIDEWALK_EDGE, BL_EDGE_UP) in floor;
+		end
+		
+			
+		#include "crosshair.ceu"
+		spawn Crosshair();
+		
+		//pool[] Render l1;
+		
+		//#include "map.ceu"
+		par/or do
+			every SDL_DT do
+				//emit p.zombieTouch;
+				//_printf(" CAM %d, %d\n", p.playerOrigin_x as int, p.playerOrigin_y as int);
+				// Mover a camera
+				camera.x = (p.playerOrigin_x - SCREEN_WIDTH/2) as int;
+				camera.y = (p.playerOrigin_y - SCREEN_HEIGHT/2) as int;
+				
+				if (camera.x < 0) then
+					camera.x = 0;
+				end
+				if (camera.y < 0) then
+					camera.y = 0;
+				end
+				if( camera.x > LEVEL_WIDTH - camera.w ) then
+					camera.x = LEVEL_WIDTH - camera.w;
+				end
+				if( camera.y > LEVEL_HEIGHT - camera.h ) then
+					camera.y = LEVEL_HEIGHT - camera.h;
+				end	
+				//_printf(" CAM %d, %d\n", camera.x as int, camera.y as int);
+				
+				var&? Shot shot;
+				loop shot in shots do
+					var&? Zombie z;
+					loop z in zombies do
+						if (call Intersects(&shot!.obj, &z!.collider)) then
+							emit shot!.die;
+							emit z!.die;
+							emit p.zombieDeath;
+						end
+					
+					end	
+				end
+				
+			end
+
+		with
+			loop do
+				await zombieTouchPlayer;
+				emit p.zombieTouch;
+			end
+		with
+			await playerDied;
+
+		end
+		
+		_printf("clique na tela para continuar\n");
+		var _SDL_MouseButtonEvent&& mb;
+		mb = await SDL_MOUSEBUTTONDOWN until mb:button == _SDL_BUTTON_LEFT;
+	
+	end
+	
+end
+
+escape 0;

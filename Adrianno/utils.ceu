@@ -1,0 +1,7 @@
+
+code/tight Intersects (var& SDL_Rect rct1, var& SDL_Rect rct2) -> bool do
+    escape rct1.x        <= rct2.x+rct2.w and
+           rct1.x+rct1.w >= rct2.x        and
+           rct1.y        <= rct2.y+rct2.h and
+           rct1.y+rct1.h >= rct2.y;
+end

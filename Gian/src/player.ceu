@@ -1,0 +1,114 @@
+#define PLAYER_SIZE 60
+
+code/await Player(var int startx, var int starty) -> (var int x, var int y, var SDL_Rect collision) -> void do
+    x = startx; y = starty;
+    var int drawOffset = BLOCK_SIZE/2;
+    var int gridx = x/BLOCK_SIZE;
+    var int gridy = y/BLOCK_SIZE;
+
+    collision = val SDL_Rect(0, 0, 0, 0);
+    
+    par/or do
+        var int dt;
+        every dt in SDL_DT do
+            {const u8 *st = SDL_GetKeyboardState(0);}
+
+            var int v = 400 * dt/1000;
+            var bool updateChasers = false;
+
+            if ( {st[SDL_SCANCODE_RIGHT]} != 0) then
+                var bool canWalk = true;
+                var SDL_Rect collision_shifted = collision;
+                collision_shifted.x = collision_shifted.x + v;
+                var&? Block block;
+                loop block in outer.blocks do
+                    if (call Intersects(&block!.collision, &collision_shifted)) then 
+                        canWalk = false; break;
+                    end
+                end
+
+                if (canWalk) then
+                    x = x + v;
+                    if (x/BLOCK_SIZE != gridx) then
+                        gridx = x/BLOCK_SIZE;
+                        updateChasers = true;
+                    end
+                end
+            end
+            if ( {st[SDL_SCANCODE_DOWN]} != 0) then
+                var bool canWalk = true;
+                var SDL_Rect collision_shifted = collision;
+                collision_shifted.y = collision_shifted.y + v;
+                var&? Block block;
+                loop block in outer.blocks do
+                    if (call Intersects(&block!.collision, &collision_shifted)) then 
+                        canWalk = false; break;
+                    end
+                end
+
+                if (canWalk) then
+                    y = y + v;
+                    if (y/BLOCK_SIZE != gridy) then
+                        gridy = y/BLOCK_SIZE;
+                        updateChasers = true;
+                    end
+                end
+            end
+            if ( {st[SDL_SCANCODE_LEFT]} != 0) then
+                var bool canWalk = true;
+                var SDL_Rect collision_shifted = collision;
+                collision_shifted.x = collision_shifted.x - v;
+                var&? Block block;
+                loop block in outer.blocks do
+                    if (call Intersects(&block!.collision, &collision_shifted)) then 
+                        canWalk = false; break;
+                    end
+                end
+                
+                if (canWalk) then
+                    x = x - v;
+                    if (x/BLOCK_SIZE != gridx) then
+                        gridx = x/BLOCK_SIZE;
+                        updateChasers = true;
+                    end
+                end
+            end
+            if ( {st[SDL_SCANCODE_UP]} != 0) then
+                var bool canWalk = true;
+                var SDL_Rect collision_shifted = collision;
+                collision_shifted.y = collision_shifted.y - v;
+                var&? Block block;
+                loop block in outer.blocks do
+                    if (call Intersects(&block!.collision, &collision_shifted)) then 
+                        canWalk = false; break;
+                    end
+                end
+
+                if (canWalk) then
+                    y = y - v;
+                    if (y/BLOCK_SIZE != gridy) then
+                        gridy = y/BLOCK_SIZE;
+                        updateChasers = true;
+                    end
+                end
+            end
+
+            outer.cameraX = _clamp(x - (WINDOW_W>>1), 0, outer.maxCameraX);
+            outer.cameraY = _clamp(y - (WINDOW_H>>1), 0, outer.maxCameraY);
+
+            collision = val SDL_Rect(x - PLAYER_SIZE/2, y - PLAYER_SIZE/2, PLAYER_SIZE, PLAYER_SIZE);
+
+            if (updateChasers) then
+                emit outer.retracePaths;
+            end
+        end
+    with
+        every SDL_REDRAW do
+            var SDL_Rect draw_rect = collision;
+            draw_rect.x = draw_rect.x - outer.cameraX;
+            draw_rect.y = draw_rect.y - outer.cameraY;
+            _SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0x00,0xCC,0x00,0xFF);
+            _SDL_RenderFillRect(&&outer.sdl!.ren, (&&draw_rect as _SDL_Rect&&));
+        end
+    end
+end

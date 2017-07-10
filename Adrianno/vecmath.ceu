@@ -1,0 +1,78 @@
+
+#ifndef VECMATH
+#define VECMATH
+
+#define PI 3.1415926535897932
+#define Vec_Print(A) _printf("%s = (%f, %f)\n", #A, A.x, A.y)
+#define PrintFloat(A) _printf("%s = %f)\n", #A, A)
+
+data Vec2d with
+    var float x;
+    var float y;
+end
+
+code/tight Vec_Length (var Vec2d v) -> float do
+	escape _sqrt((v.x * v.x) + (v.y*v.y));
+end
+
+code/tight Vec_Normalize (var Vec2d v) -> Vec2d do
+	var float len = call Vec_Length(v);
+	var Vec2d ret = val Vec2d( (v.x/len), (v.y/len));
+	escape ret;
+
+end 
+
+code/tight Vec_GetDistance(var int x0, var int y0, var int xf, var int yf) -> float do
+	var int vx = xf - x0;
+	var int vy = yf - y0;
+	var Vec2d vec = val Vec2d(vx as float, vy as float);
+	var float r = call Vec_Length(vec);
+	escape r;
+end
+
+code/tight Vec_GetDirection(var int x0, var int y0, var int xf, var int yf) -> Vec2d do
+	var int vx = xf - x0;
+	var int vy = yf - y0;
+	var Vec2d vec = val Vec2d(vx as float, vy as float);
+	vec = call Vec_Normalize(vec);
+	escape vec;
+end
+
+code/tight Vec_DotProduct(var Vec2d v1, var Vec2d v2) -> float do
+	escape (v1.x*v2.x) + (v1.y * v2.y);
+end
+
+code/tight Vec_ScalarDivision (var Vec2d v, var float s) -> Vec2d do
+	var Vec2d ret = val Vec2d(v.x/s, v.y/s);
+	escape ret;
+end
+
+code/tight RadToDegree( var float rad) -> float do
+	escape (rad * 180)/PI;
+end
+
+code/tight DegreeToRad( var float deg ) -> float do
+	escape (deg*PI)/180;
+
+end
+
+ code/tight Vec_AngleBetween(var Vec2d v1, var Vec2d v2) -> float do
+	//Vec_Print(v1);
+	//Vec_Print(v2);
+	var float len1 = call Vec_Length(v1);
+	var float len2 = call Vec_Length(v2);
+	//PrintFloat(len1);
+	//PrintFloat(len2);
+	var float dot = call Vec_DotProduct(v1, v2);
+	//PrintFloat(dot);
+	var float ret = call RadToDegree(_acos(dot/(len1*len2)));
+	//PrintFloat(ret);
+	
+	var float ang = _atan2(v1.x, v1.y) -  _atan2(v2.x, v2.y);
+	ret = call RadToDegree(ang);
+	//PrintFloat(ret);
+	escape ret;
+end
+
+
+#endif // VECMATH

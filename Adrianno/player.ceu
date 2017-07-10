@@ -1,0 +1,500 @@
+
+#define PL_TILE_SIZE 100
+#define PL_FRAME_OFFSET_HORIZONTAL 5
+#define PL_FRAME_OFFSET_VERTICAL 20
+
+#define PL_RELOAD_FRAMES 19
+#define PL_ANIM_RELOAD_START 1
+
+#define PL_DEATH_FRAMES 10
+#define PL_ANIM_DEATH_START 30
+
+
+#define PL_ANIM_IDLE_START 0
+
+
+/********************  RANDOM QUOTES ********************/
+var& SDL_Open_Sound snd_RAND_1 = spawn SDL_Open_Sound("res/snds/rand_corpo.wav");
+var& SDL_Open_Sound snd_RAND_2 = spawn SDL_Open_Sound("res/snds/rand_michael.wav");
+var& SDL_Open_Sound snd_RAND_3 = spawn SDL_Open_Sound("res/snds/rand_pedacinho.wav");
+var& SDL_Open_Sound snd_RAND_4 = spawn SDL_Open_Sound("res/snds/rand_tedio.wav");
+var& SDL_Open_Sound snd_RAND_5 = spawn SDL_Open_Sound("res/snds/rand_viver.wav");
+var& SDL_Open_Sound snd_RAND_6 = spawn SDL_Open_Sound("res/snds/rand_vivo.wav");
+
+
+/********************  SHOT QUOTES ********************/
+var& SDL_Open_Sound snd_SHOT_1 = spawn SDL_Open_Sound("res/snds/shot_morram.wav");
+var& SDL_Open_Sound snd_SHOT_2 = spawn SDL_Open_Sound("res/snds/shot_risada_1.wav");
+var& SDL_Open_Sound snd_SHOT_3 = spawn SDL_Open_Sound("res/snds/shot_risada_2.wav");
+
+
+/********************  PAIN/DEATH ********************/
+var& SDL_Open_Sound snd_PAIN_1 = spawn SDL_Open_Sound("res/snds/dor_1.wav");
+var& SDL_Open_Sound snd_PAIN_2 = spawn SDL_Open_Sound("res/snds/dor_2.wav");
+var& SDL_Open_Sound snd_PAIN_3 = spawn SDL_Open_Sound("res/snds/dor_3.wav");
+var& SDL_Open_Sound snd_PAIN_4 = spawn SDL_Open_Sound("res/snds/dor_4.wav");
+var& SDL_Open_Sound snd_DEATH  = spawn SDL_Open_Sound("res/snds/_morte.wav");
+
+/********************  ZOMBIE DEATH QUOTES ********************/
+var& SDL_Open_Sound snd_ZD_1 = spawn SDL_Open_Sound("res/snds/mz_batata.wav");
+var& SDL_Open_Sound snd_ZD_2 = spawn SDL_Open_Sound("res/snds/mz_morreu.wav");
+var& SDL_Open_Sound snd_ZD_3 = spawn SDL_Open_Sound("res/snds/mz_pontaria.wav");
+var& SDL_Open_Sound snd_ZD_4 = spawn SDL_Open_Sound("res/snds/mz_queixo.wav");
+var& SDL_Open_Sound snd_ZD_5 = spawn SDL_Open_Sound("res/snds/mz_rosto.wav");
+
+
+/******************* SHOT SOUNDS ***********************/
+var& SDL_Open_Sound snd_SHOT = spawn SDL_Open_Sound("res/shot_d.wav");
+
+var& SDL_Open_Image tx_player_recharge = spawn SDL_Open_Image( &sdl!.ren, "res/spritesheet.png");
+var& SDL_Open_Image tx_player_idle = spawn SDL_Open_Image( &sdl!.ren, "res/char_idle.png");
+
+
+//
+
+code/await Player(var float x0, var float y0)-> 
+				(var float playerOrigin_x, 
+				var float playerOrigin_y, 
+				event void zombieDeath,
+				event void zombieTouch,
+				var SDL_Rect collider,
+				event void die) -> FOREVER do
+	
+	
+	/******** PLAYER **************/
+	//{
+	var float playerSize = 80.0;
+	var int playerHealth = 100;
+	
+	event void random;
+	event void shot;
+	event void pain;
+	event void death;
+
+	var SDL_Rect fg = val SDL_Rect(x0 as int, y0 as int, playerSize as int, playerSize as int);
+	collider = val SDL_Rect((x0 + 30) as int, (y0+30) as int, (playerSize-60) as int, (playerSize-60) as int);
+	var SDL_Rect render = val SDL_Rect(x0 as int, y0 as int, playerSize as int, playerSize as int);
+	//}
+	
+	/******** ANIMATION **********/ 
+	//{
+	var int animationFrame = 0;
+	
+	code/tight NextFrame(var int f, var int max) -> int do
+		var int ret = f + 1;
+		if(ret == max) then
+			escape 0;
+		else
+			escape ret;
+		end
+	end
+
+	code/tight GetFrameRect(var int frame) -> SDL_Rect do
+		var SDL_Rect r = val SDL_Rect(  PL_TILE_SIZE*frame + PL_FRAME_OFFSET_HORIZONTAL,
+										PL_FRAME_OFFSET_VERTICAL,
+										PL_TILE_SIZE - 2*PL_FRAME_OFFSET_HORIZONTAL,
+										PL_TILE_SIZE );		
+		escape r;
+	end
+	//}
+	
+	/******** SHOT **************/
+	//{
+	var int shotSpeed = 60;
+	var int shotSize = 10;	
+	var Vec2d shotSpawner = val Vec2d(0, 0);
+	var int spawnerOffset = 2;
+	//}
+	
+	/******** PLAYER MOVEMENT **************/
+	//{
+	var float angle = 0.0;
+	var float radius = playerSize/2;
+
+	var int target_x = 0;
+	var int target_y = 0;
+
+	var int xc = (x0 + 30) as int;
+	var int yc = (y0 + 30) as int;
+	
+	var int x = x0 as int;
+	var int y = y0 as int;
+	var int vx = 0;
+	var int vy = 0; 
+	var int spd = 20;
+	var bool mouse = true;
+	var int dt = 0;
+	
+	playerOrigin_x = 0;
+	playerOrigin_y = 0;
+	var Vec2d playerDirection = _;
+	
+	code/tight UpdateOrigin(void) -> void do
+		outer.playerOrigin_x = outer.fg.x + outer.radius;
+		outer.playerOrigin_y = outer.fg.y + outer.radius;
+	end
+	//}
+	
+	/******** VOICE *************/
+	//{
+	var bool speaking = false;
+	
+ 	code/await PlayVoice(var& SDL_Open_Sound snd) -> void do
+		if (outer.speaking == false) then
+			_Mix_PlayChannel(-1, &&snd.sound, 0);
+			await 1 s;
+			//outer.speaking = false;
+		end
+	end
+	
+	code/await PlayRandom(void) -> void do
+		var int tmp = _rand()%4;
+		if(tmp == 1) then
+			_printf("BIRRRL\n");
+			var int voice = (_rand()%7);
+			if(voice == 0) then
+				spawn PlayVoice(&outer.snd_RAND_1);
+			else/if(voice == 1) then
+				spawn PlayVoice(&outer.snd_RAND_2);
+			else/if(voice == 2) then
+				spawn PlayVoice(&outer.snd_RAND_3);
+			else/if(voice == 3) then 
+				spawn PlayVoice(&outer.snd_RAND_4);
+			else/if(voice == 4) then
+				spawn PlayVoice(&outer.snd_RAND_5) ;
+			else
+				spawn PlayVoice(&outer.snd_RAND_6);
+			end
+			//outer.speaking = true;
+			await 10s;
+			//outer.speaking = false;
+		end
+	end
+	
+	code/await PlayShot(void) -> void do
+		var int tmp = _rand()%4;
+		if(tmp == 1) then
+			_printf("BIRRRL\n");
+			var int voice = (_rand()%3) - 1;
+			if(voice == 0) then
+				spawn PlayVoice(&outer.snd_SHOT_1);
+			else/if(voice == 1) then
+				spawn PlayVoice(&outer.snd_SHOT_2);
+			else
+				spawn PlayVoice(&outer.snd_SHOT_3);
+			end
+			await 10s;
+		end
+	end
+	
+	code/await PlayPain(void) -> void do
+		var int tmp = _rand()%2;
+		if(tmp == 1) then
+			_printf("BIRRRL\n");
+			var int voice = (_rand()%4) - 1;
+			if(voice == 0) then
+				spawn PlayVoice(&outer.snd_PAIN_1);
+			else/if(voice == 1) then
+				spawn PlayVoice(&outer.snd_PAIN_2);
+			else/if(voice == 2) then
+				spawn PlayVoice(&outer.snd_PAIN_3);
+			else
+				spawn PlayVoice(&outer.snd_PAIN_4);
+			end
+			//await 4s;
+		end
+	end
+	
+	
+	code/await PlayDeath(void) -> void do
+		var int tmp = 1;//_rand()%2;
+		if(tmp == 1) then
+			_printf("BIRRRL\n");
+			var int voice = (_rand()%5) - 1;
+			if(voice == 0) then
+				spawn PlayVoice(&outer.snd_ZD_1);
+			else/if(voice == 1) then
+				spawn PlayVoice(&outer.snd_ZD_2);
+			else/if(voice == 2) then
+				spawn PlayVoice(&outer.snd_ZD_3);
+			else/if(voice == 2) then
+				spawn PlayVoice(&outer.snd_ZD_4);
+			else
+				spawn PlayVoice(&outer.snd_ZD_5);
+			end
+			await 10s;
+		end
+	end
+	//}
+
+	
+	// States of the keys:     W      A      S      D
+	//                         |      |      |      |
+  	vector[4] bool states = [false, false, false, false];
+	
+	
+	par/or do
+		every dt in SDL_DT do
+		
+			var bool go_x = true;
+			var bool go_y = true;
+			
+			vx = ((states[1]as int)*(-spd)) + ((states[3] as int)*spd);
+			vy = ((states[0]as int)*(-spd)) + ((states[2] as int)*spd);
+			
+			var int xf = x + vx*dt/100;
+			var int yf = y + vy*dt/100;
+			
+			var int xcf = collider.x + vx*dt/100;
+			var int ycf = collider.y + vy*dt/100;
+ 			
+			if xcf < 0 or xcf > LEVEL_WIDTH - 2*radius then
+				go_x = false;
+			end
+			
+			if ycf < 0 or ycf > (LEVEL_HEIGHT - 2*radius) then
+				go_y = false;
+			end
+			
+			var SDL_Rect tmp_x = val SDL_Rect(xcf, collider.y, playerSize as int, playerSize as int);
+			var SDL_Rect tmp_y = val SDL_Rect(collider.x, ycf, playerSize as int, playerSize as int);
+			
+			var&? ObstacleBlock block;
+			
+			loop block in outer.roof do
+				if (call Intersects(&block!.surface, &tmp_x)) then
+					go_x = false;
+				end
+				if (call Intersects(&block!.surface, &tmp_y)) then
+					go_y = false;
+				end
+				if ( go_x == false) and (go_y == false) then
+					break;
+				end
+			end
+			
+			if go_x then
+				x = xf;
+				xc = xcf;
+			end
+			
+			if go_y then
+				y = yf; 
+				yc = ycf;
+			end
+			
+			call UpdateOrigin();
+			
+			render.x = fg.x - outer.camera.x;
+			render.y = fg.y - outer.camera.y;
+			
+			var Vec2d vec = call Vec_GetDirection(  (playerOrigin_x) as int, 
+													(playerOrigin_y) as int, 
+													target_x, 
+													target_y);
+			var Vec2d yaxis = call Vec_GetDirection( 0, 0, 0, -1);
+			angle = call Vec_AngleBetween(yaxis, vec);
+			vec = call Vec_Normalize(vec);
+			playerDirection = vec;
+			
+			shotSpawner.x = playerOrigin_x + (playerDirection.x * (radius + spawnerOffset));
+			shotSpawner.y = playerOrigin_y + (playerDirection.y * (radius + spawnerOffset));
+
+		end
+	with // HEALTH
+		
+		loop do
+			await zombieTouch;
+			playerHealth = playerHealth - 20;
+			_printf("AAAAAAAAAAAAAAAAAAAAAI\n");
+			_printf("Health: %d\n", playerHealth);
+			emit pain;
+			await 1s;
+			if playerHealth <= 0 then
+				emit die;
+			end
+		end
+	
+	
+	with // PLAY RANDOM VOICE
+		
+		//pool[1] PlayRandom v;
+		//every 1s do 
+		loop do
+			par/or do
+				par/or do
+					await 10s;
+					spawn PlayRandom();
+					//await 10s;
+				with
+					await shot;
+					_printf("EVENT SHOT\n");
+					spawn PlayShot();
+					await 1s;
+				with
+					await zombieDeath;
+					_printf("LALALALALA\n");
+					spawn PlayDeath();
+					//await 7s;
+				end
+				await 7s;
+			with
+				await pain;
+				spawn PlayPain();
+				await 1s;
+			end
+			
+			
+		end
+	
+	
+	 /************** KEYBOARD **********************/
+	 //{
+	with // KEYBOARD W
+		loop do
+			var _SDL_KeyboardEvent&& kb;
+			kb = await SDL_KEYDOWN until kb:keysym.sym == _SDLK_w;
+			_printf("W\n");
+			states[0] = true;
+			kb = await SDL_KEYUP until kb:keysym.sym == _SDLK_w;
+			states[0] = false;
+		end
+	with // KEYBOARD A
+		loop do
+			var _SDL_KeyboardEvent&& kb;
+			kb = await SDL_KEYDOWN until kb:keysym.sym == _SDLK_a;
+			_printf("A\n");
+			states[1] = true;
+			kb = await SDL_KEYUP until kb:keysym.sym == _SDLK_a;
+			states[1] = false;
+		end		
+	with // KEYBOARD S
+		loop do
+			var _SDL_KeyboardEvent&& kb;
+			kb = await SDL_KEYDOWN until kb:keysym.sym == _SDLK_s;
+			_printf("S\n");
+			states[2] = true;
+			kb = await SDL_KEYUP until kb:keysym.sym == _SDLK_s;
+			states[2] = false;
+		end
+	with // KEYBOARD D
+		loop do
+			var _SDL_KeyboardEvent&& kb;
+			kb = await SDL_KEYDOWN until kb:keysym.sym == _SDLK_d;
+			_printf("D\n");
+			states[3] = true;
+			kb = await SDL_KEYUP until kb:keysym.sym == _SDLK_d;
+			states[3] = false;
+		end
+	 //}
+	
+	/************** MOUSE_CLICK ********************/
+	//{
+	with // MOUSE CLICK
+
+		loop do
+			var _SDL_MouseButtonEvent&& mb;
+			mb = await SDL_MOUSEBUTTONDOWN until mb:button == _SDL_BUTTON_LEFT;
+			var int dist = call Vec_GetDistance(mb:x + outer.camera.x, 
+												mb:y + outer.camera.y, 
+												(playerOrigin_x) as int, 
+												(playerOrigin_y) as int) as int;
+			if dist > 50 then 
+
+				_Mix_PlayChannel(-1, &&outer.snd_SHOT.sound, 0);
+				var Vec2d dir = call Vec_GetDirection(shotSpawner.x as int, 
+							                          shotSpawner.y as int, 
+													  mb:x + outer.camera.x, 
+													  mb:y + outer.camera.y);
+
+				var int i;
+				loop i in [0 -> 4[ do
+					var int rot_angle = (i-2)*4;
+
+					var float cos = _cos(call DegreeToRad(rot_angle as float));
+					var float sin = _sin(call DegreeToRad(rot_angle as float));
+
+					var float xi = dir.x*cos - dir.y*sin;
+					var float yi = dir.x*sin + dir.y*cos;
+
+					var Vec2d tmp_vec = val Vec2d(xi, yi);
+					
+					spawn Shot( shotSpawner.x as int, 
+								shotSpawner.y as int,
+								tmp_vec,
+								shotSpeed +((_rand()%2)*(-1)) * (_rand()%3) ,
+								shotSize,
+								0) in outer.shots;
+				end
+	
+				animationFrame = PL_ANIM_RELOAD_START;
+				_printf("sound\n");
+				emit shot;
+				await 750ms;
+			end
+		end
+	//}
+	with // MOUSE MOVEMENT	
+		var _SDL_MouseMotionEvent&& mse;
+		every mse in SDL_MOUSEMOTION do
+			target_x = mse:x + outer.camera.x;
+			target_y = mse:y + outer.camera.y;
+		end
+	with 
+        every 80ms do
+			if(animationFrame >= PL_ANIM_RELOAD_START) then
+				animationFrame = call NextFrame(animationFrame, PL_RELOAD_FRAMES + PL_ANIM_RELOAD_START - 1);
+			end
+        end
+
+	with   // RENDER
+		every SDL_REDRAW do	
+			var SDL_Rect clip_rect = call GetFrameRect(animationFrame);
+			
+			collider.x = xc;
+			collider.y = yc;
+	
+			fg.x = x;
+			fg.y = y;
+			
+			var SDL_Rect tmp = val SDL_Rect(fg.x - outer.camera.x,
+											fg.y - outer.camera.y,
+											playerSize as int, 
+											playerSize as int);
+			
+			_SDL_RenderCopyEx(  &&outer.sdl!.ren, 
+								&&outer.tx_player_recharge.tex.tex, 
+								&&clip_rect as _SDL_Rect&&,
+								&&tmp as _SDL_Rect&&, 
+								angle, null, _SDL_FLIP_NONE);
+
+		end
+	with
+		await die;
+	end
+	
+	spawn PlayVoice(&outer.snd_DEATH);
+	emit outer.playerDied;
+	_printf("MORREU\n");
+	var SDL_Rect clip_rect = call GetFrameRect(39);
+	par do 
+		every SDL_REDRAW do	
+			
+			
+			var SDL_Rect tmp = val SDL_Rect(fg.x - outer.camera.x,
+											fg.y - outer.camera.y,
+											playerSize as int, 
+											playerSize as int);
+			
+			_SDL_RenderCopyEx(  &&outer.sdl!.ren, 
+								&&outer.tx_player_recharge.tex.tex, 
+								&&clip_rect as _SDL_Rect&&,
+								&&tmp as _SDL_Rect&&, 
+								angle, null, _SDL_FLIP_NONE);
+
+		end
+	with
+
+	end
+
+end

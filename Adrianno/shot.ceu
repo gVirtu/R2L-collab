@@ -1,0 +1,123 @@
+#define SH_TILE_SIZE 20
+
+var& SDL_Open_Image tx_shot = spawn SDL_Open_Image( &sdl!.ren, "res/shot_b.png");
+
+code/await Shot(var int x0, var int y0, var Vec2d direction, 
+				var int spd, var int size, var int angleOffset) -> 
+				(event void die, var SDL_Rect obj) -> void do
+	
+	
+	var Vec2d yaxis = call Vec_GetDirection( 0, 0, 0, -1);
+	var int angle = call Vec_AngleBetween(yaxis, direction) as int;
+	angle = angle + angleOffset;
+	
+	obj = val SDL_Rect(x0, y0, size, size);
+	//var SDL_Rect collision = val SDL_Rect(x0, y0, size, size);
+	var float vx = (direction.x * spd);
+	var float vy = (direction.y * spd);
+ 	
+	var float x = x0 as float;
+	var float y = y0 as float;
+	var int dt = 0;
+	
+	par/or do
+		every dt in SDL_DT do
+		
+			var int xf = (x + vx*dt/100) as int;
+			var int yf = (y + vy*dt/100) as int;	
+			
+			if(xf < 0) or (xf > LEVEL_WIDTH) then
+				emit die;
+			end
+			
+			if (yf < 0) or (yf > LEVEL_HEIGHT) then
+				emit die;
+			end
+			var SDL_Rect tmp = val SDL_Rect(xf, yf, size, size);
+			var&? ObstacleBlock block;
+			loop block in outer.roof do
+				if (call Intersects(&block!.surface, &tmp)) then
+					emit die;
+				end			
+			end
+			x = xf;
+			y = yf;
+			
+			
+		end
+	with   // RENDER
+		every SDL_REDRAW do			
+			obj.y = y as int;
+			obj.x = x as int;
+			//_SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0xFF,0x00,0x00,0xFF);
+			//_SDL_RenderFillRect(&&outer.sdl!.ren, (&&obj as _SDL_Rect&&));
+			
+			var SDL_Rect clip_rect = val SDL_Rect(  0, 0,
+													SH_TILE_SIZE, 
+													SH_TILE_SIZE);
+													
+			var SDL_Rect render = val SDL_Rect( (obj.x as int) - outer.camera.x, 
+												(obj.y as int) - outer.camera.y,
+												size, size);
+													
+			_SDL_RenderCopyEx(  &&outer.sdl!.ren, 
+								&&outer.tx_shot.tex.tex, 
+								null,
+								&&render as _SDL_Rect&&, 
+								angle, null, _SDL_FLIP_NONE);
+		end
+	with 
+		await die;
+	end
+
+end
+
+
+
+/*
+
+
+var& SDL_Open_Image tx_shot = spawn SDL_Open_Image( &sdl!.ren, "res/shot_b.png");
+
+code/await Shot(var int x0, var int y0, var int xf, var int yf, var int spd, var int size, var int angleOffset) -> void do
+	
+	var Vec2d direction = call Vec_GetDirection(x0, y0, xf, yf);
+	var Vec2d yaxis = call Vec_GetDirection( 0, 0, 0, -1);
+	var int angle = call Vec_AngleBetween(yaxis, direction) as int;
+	angle = angle + angleOffset;
+	
+	var SDL_Rect obj = val SDL_Rect(x0, y0, size, size);
+	//var SDL_Rect collision = val SDL_Rect(x0, y0, size, size);
+	var float vx = (direction.x * spd);
+	var float vy = (direction.y * spd);
+ 	
+	var float x = x0 as float;
+	var float y = y0 as float;
+	var int dt = 0;
+
+	loop do
+		par do
+			every dt in SDL_DT do
+				x = x + vx*dt/100;
+				y = y + vy*dt/100;	
+			end
+		with   // RENDER
+			every SDL_REDRAW do			
+				obj.y = y as int;
+				obj.x = x as int;
+				//_SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0xFF,0x00,0x00,0xFF);
+				//_SDL_RenderFillRect(&&outer.sdl!.ren, (&&obj as _SDL_Rect&&));
+				
+				var SDL_Rect clip_rect = val SDL_Rect(  0, 0,
+														SH_TILE_SIZE, 
+														SH_TILE_SIZE);
+				_SDL_RenderCopyEx(  &&outer.sdl!.ren, 
+									&&outer.tx_shot.tex.tex, 
+									null,
+									&&obj as _SDL_Rect&&, 
+									angle, null, _SDL_FLIP_NONE);
+			end
+			
+		end
+	end
+end*/
