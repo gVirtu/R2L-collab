@@ -1,7 +1,9 @@
 #define ZOMBIE_SIZE 40
 
 #define ZB_ANIM_WALK_START 0
-#define ZB_ANIM_WALK_END 30
+#define ZB_ANIM_WALK_END 22
+#define ZB_ANIM_DIE_START 22
+#define ZB_ANIM_DIE_END 30
 
 var& SDL_Open_Image tx_zombie = spawn SDL_Open_Image( &sdl!.ren, "res/spritesheet_zombie.png");
 
@@ -62,24 +64,24 @@ code/await Zombie(var int x0, var int y0, var int speed) ->
 			var int yf = (collider.y + dir.y) as int;
 	
 			
-			if xf < 0 or xf > LEVEL_WIDTH - ZOMBIE_SIZE then
+			if xf < 0 or xf > (outer.level_width - ZOMBIE_SIZE) then
 				go_x = false;
 			end
 			
-			if yf < 0 or yf > (LEVEL_HEIGHT - ZOMBIE_SIZE) then
+			if yf < 0 or yf > (outer.level_height - ZOMBIE_SIZE) then
 				go_y = false;
 			end
 			
 			var SDL_Rect tmp_x = val SDL_Rect(xf, collider.y, ZOMBIE_SIZE, ZOMBIE_SIZE);
 			var SDL_Rect tmp_y = val SDL_Rect(collider.x, yf, ZOMBIE_SIZE, ZOMBIE_SIZE);
 			
-			var&? ObstacleBlock block;
+			var&? CollisionBlock block;
 
-			loop block in outer.roof do
-				if (call Intersects(&block!.surface, &tmp_x)) then
+			loop block in outer.blocks do
+				if (call Intersects(&block!.collision, &tmp_x)) then
 					go_x = false;
 				end
-				if (call Intersects(&block!.surface, &tmp_y)) then
+				if (call Intersects(&block!.collision, &tmp_y)) then
 					go_y = false;
 				end
 				if ( go_x == false) and (go_y == false) then
@@ -109,7 +111,7 @@ code/await Zombie(var int x0, var int y0, var int speed) ->
 													target_x,
 													target_y);
 													
-			_printf("direction x = %f   y = %f\n", dir.x, dir.y);
+			//_printf("direction x = %f   y = %f\n", dir.x, dir.y);
 		end
 	with // ANIMATION
 		every 80ms do

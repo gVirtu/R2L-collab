@@ -1,0 +1,24 @@
+
+code/tight Intersects (var& SDL_Rect rct1, var& SDL_Rect rct2) -> bool do
+    escape rct1.x        <= rct2.x+rct2.w and
+           rct1.x+rct1.w >= rct2.x        and
+           rct1.y        <= rct2.y+rct2.h and
+           rct1.y+rct1.h >= rct2.y;
+end
+
+code/tight NextFrame(var int f, var int max) -> int do
+    var int ret = f + 1;
+    if(ret == max) then
+        escape 0;
+    else
+        escape ret;
+    end
+end
+
+code/tight GetFrameRect(var int frame, var int size, var int lxoffset, var int tyoffset, var int wxoffset, var int hyoffset) -> SDL_Rect do
+    var SDL_Rect r = val SDL_Rect(  size*frame + lxoffset,
+                                    tyoffset,
+                                    size + wxoffset,
+                                    size + hyoffset);		
+    escape r;
+end

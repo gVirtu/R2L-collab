@@ -26,17 +26,17 @@ code/await Shot(var int x0, var int y0, var Vec2d direction,
 			var int xf = (x + vx*dt/100) as int;
 			var int yf = (y + vy*dt/100) as int;	
 			
-			if(xf < 0) or (xf > LEVEL_WIDTH) then
+			if(xf < 0) or (xf > outer.level_width) then
 				emit die;
 			end
 			
-			if (yf < 0) or (yf > LEVEL_HEIGHT) then
+			if (yf < 0) or (yf > outer.level_height) then
 				emit die;
 			end
 			var SDL_Rect tmp = val SDL_Rect(xf, yf, size, size);
-			var&? ObstacleBlock block;
-			loop block in outer.roof do
-				if (call Intersects(&block!.surface, &tmp)) then
+			var&? CollisionBlock block;
+			loop block in outer.blocks do
+				if (call Intersects(&block!.collision, &tmp)) then
 					emit die;
 				end			
 			end

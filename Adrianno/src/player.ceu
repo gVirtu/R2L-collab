@@ -70,6 +70,7 @@ code/await Player(var float x0, var float y0)->
 	event void shot;
 	event void pain;
 	event void death;
+	event bool invFrames;
 
 	var SDL_Rect fg = val SDL_Rect(x0 as int, y0 as int, playerSize as int, playerSize as int);
 	collider = val SDL_Rect((x0 + 30) as int, (y0+30) as int, (playerSize-60) as int, (playerSize-60) as int);
@@ -79,23 +80,7 @@ code/await Player(var float x0, var float y0)->
 	/******** ANIMATION **********/ 
 	//{
 	var int animationFrame = 0;
-	
-	code/tight NextFrame(var int f, var int max) -> int do
-		var int ret = f + 1;
-		if(ret == max) then
-			escape 0;
-		else
-			escape ret;
-		end
-	end
 
-	code/tight GetFrameRect(var int frame) -> SDL_Rect do
-		var SDL_Rect r = val SDL_Rect(  PL_TILE_SIZE*frame + PL_FRAME_OFFSET_HORIZONTAL,
-										PL_FRAME_OFFSET_VERTICAL,
-										PL_TILE_SIZE - 2*PL_FRAME_OFFSET_HORIZONTAL,
-										PL_TILE_SIZE );		
-		escape r;
-	end
 	//}
 	
 	/******** SHOT **************/
@@ -140,34 +125,32 @@ code/await Player(var float x0, var float y0)->
 	var bool speaking = false;
 	
  	code/await PlayVoice(var& SDL_Open_Sound snd) -> void do
-		if (outer.speaking == false) then
-			_Mix_PlayChannel(-1, &&snd.sound, 0);
-			await 1 s;
-			//outer.speaking = false;
-		end
+	 	var int ret;
+		ret = _Mix_PlayChannel(outer.voiceChannel, &&snd.sound, 0);
+		_printf("-------------------PLAY SOUND RESULT = %d\n",ret);
 	end
 	
 	code/await PlayRandom(void) -> void do
 		var int tmp = _rand()%4;
 		if(tmp == 1) then
 			_printf("BIRRRL\n");
-			var int voice = (_rand()%7);
-			if(voice == 0) then
-				spawn PlayVoice(&outer.snd_RAND_1);
-			else/if(voice == 1) then
-				spawn PlayVoice(&outer.snd_RAND_2);
-			else/if(voice == 2) then
-				spawn PlayVoice(&outer.snd_RAND_3);
-			else/if(voice == 3) then 
-				spawn PlayVoice(&outer.snd_RAND_4);
-			else/if(voice == 4) then
-				spawn PlayVoice(&outer.snd_RAND_5) ;
-			else
-				spawn PlayVoice(&outer.snd_RAND_6);
+			if (_Mix_Playing(outer.voiceChannel) == 0) then 
+				var int voice = (_rand()%7);
+				if(voice == 0) then
+					spawn PlayVoice(&outer.snd_RAND_1);
+				else/if(voice == 1) then
+					spawn PlayVoice(&outer.snd_RAND_2);
+				else/if(voice == 2) then
+					spawn PlayVoice(&outer.snd_RAND_3);
+				else/if(voice == 3) then 
+					spawn PlayVoice(&outer.snd_RAND_4);
+				else/if(voice == 4) then
+					spawn PlayVoice(&outer.snd_RAND_5) ;
+				else
+					spawn PlayVoice(&outer.snd_RAND_6);
+				end
 			end
-			//outer.speaking = true;
 			await 10s;
-			//outer.speaking = false;
 		end
 	end
 	
@@ -175,52 +158,56 @@ code/await Player(var float x0, var float y0)->
 		var int tmp = _rand()%4;
 		if(tmp == 1) then
 			_printf("BIRRRL\n");
-			var int voice = (_rand()%3) - 1;
-			if(voice == 0) then
-				spawn PlayVoice(&outer.snd_SHOT_1);
-			else/if(voice == 1) then
-				spawn PlayVoice(&outer.snd_SHOT_2);
-			else
-				spawn PlayVoice(&outer.snd_SHOT_3);
+			if (_Mix_Playing(outer.voiceChannel) == 0) then 
+				var int voice = (_rand()%3) - 1;
+				if(voice == 0) then
+					spawn PlayVoice(&outer.snd_SHOT_1);
+				else/if(voice == 1) then
+					spawn PlayVoice(&outer.snd_SHOT_2);
+				else
+					spawn PlayVoice(&outer.snd_SHOT_3);
+				end
 			end
 			await 10s;
 		end
 	end
 	
 	code/await PlayPain(void) -> void do
-		var int tmp = _rand()%2;
-		if(tmp == 1) then
-			_printf("BIRRRL\n");
-			var int voice = (_rand()%4) - 1;
-			if(voice == 0) then
-				spawn PlayVoice(&outer.snd_PAIN_1);
-			else/if(voice == 1) then
-				spawn PlayVoice(&outer.snd_PAIN_2);
-			else/if(voice == 2) then
-				spawn PlayVoice(&outer.snd_PAIN_3);
-			else
-				spawn PlayVoice(&outer.snd_PAIN_4);
-			end
-			//await 4s;
+		_printf("BIRRRL\n");
+		if (_Mix_Playing(outer.voiceChannel) == 1) then
+			_Mix_HaltChannel(outer.voiceChannel);
 		end
+		var int voice = (_rand()%4) - 1;
+		if(voice == 0) then
+			spawn PlayVoice(&outer.snd_PAIN_1);
+		else/if(voice == 1) then
+			spawn PlayVoice(&outer.snd_PAIN_2);
+		else/if(voice == 2) then
+			spawn PlayVoice(&outer.snd_PAIN_3);
+		else
+			spawn PlayVoice(&outer.snd_PAIN_4);
+		end
+		//await 4s;
 	end
 	
 	
-	code/await PlayDeath(void) -> void do
-		var int tmp = 1;//_rand()%2;
+	code/await PlayKill(void) -> void do
+		var int tmp = _rand()%2;
 		if(tmp == 1) then
 			_printf("BIRRRL\n");
-			var int voice = (_rand()%5) - 1;
-			if(voice == 0) then
-				spawn PlayVoice(&outer.snd_ZD_1);
-			else/if(voice == 1) then
-				spawn PlayVoice(&outer.snd_ZD_2);
-			else/if(voice == 2) then
-				spawn PlayVoice(&outer.snd_ZD_3);
-			else/if(voice == 2) then
-				spawn PlayVoice(&outer.snd_ZD_4);
-			else
-				spawn PlayVoice(&outer.snd_ZD_5);
+			if (_Mix_Playing(outer.voiceChannel) == 0) then 
+				var int voice = (_rand()%5) - 1;
+				if(voice == 0) then
+					spawn PlayVoice(&outer.snd_ZD_1);
+				else/if(voice == 1) then
+					spawn PlayVoice(&outer.snd_ZD_2);
+				else/if(voice == 2) then
+					spawn PlayVoice(&outer.snd_ZD_3);
+				else/if(voice == 2) then
+					spawn PlayVoice(&outer.snd_ZD_4);
+				else
+					spawn PlayVoice(&outer.snd_ZD_5);
+				end
 			end
 			await 10s;
 		end
@@ -248,24 +235,24 @@ code/await Player(var float x0, var float y0)->
 			var int xcf = collider.x + vx*dt/100;
 			var int ycf = collider.y + vy*dt/100;
  			
-			if xcf < 0 or xcf > LEVEL_WIDTH - 2*radius then
+			if xcf < 0 or xcf > (outer.level_width - 2*radius) then
 				go_x = false;
 			end
 			
-			if ycf < 0 or ycf > (LEVEL_HEIGHT - 2*radius) then
+			if ycf < 0 or ycf > (outer.level_height - 2*radius) then
 				go_y = false;
 			end
 			
 			var SDL_Rect tmp_x = val SDL_Rect(xcf, collider.y, collider.w, collider.h);
 			var SDL_Rect tmp_y = val SDL_Rect(collider.x, ycf, collider.w, collider.h);
 			
-			var&? ObstacleBlock block;
+			var&? CollisionBlock block;
 			
-			loop block in outer.roof do
-				if (call Intersects(&block!.surface, &tmp_x)) then
+			loop block in outer.blocks do
+				if (call Intersects(&block!.collision, &tmp_x)) then
 					go_x = false;
 				end
-				if (call Intersects(&block!.surface, &tmp_y)) then
+				if (call Intersects(&block!.collision, &tmp_y)) then
 					go_y = false;
 				end
 				if ( go_x == false) and (go_y == false) then
@@ -296,6 +283,12 @@ code/await Player(var float x0, var float y0)->
 			angle = call Vec_AngleBetween(yaxis, vec);
 			vec = call Vec_Normalize(vec);
 			playerDirection = vec;
+
+			collider.x = xc;
+			collider.y = yc;
+	
+			fg.x = x;
+			fg.y = y;
 			
 			shotSpawner.x = playerOrigin_x + (playerDirection.x * (radius + spawnerOffset));
 			shotSpawner.y = playerOrigin_y + (playerDirection.y * (radius + spawnerOffset));
@@ -309,10 +302,18 @@ code/await Player(var float x0, var float y0)->
 			_printf("AAAAAAAAAAAAAAAAAAAAAI\n");
 			_printf("Health: %d\n", playerHealth);
 			emit pain;
-			await 1s;
 			if playerHealth <= 0 then
 				emit die;
-			end
+			else 
+				watching 1s do
+					loop do
+						emit invFrames(true);
+						await 100ms;
+						emit invFrames(false);
+						await 100ms;
+					end
+				end
+			end			
 		end
 	
 	
@@ -334,17 +335,14 @@ code/await Player(var float x0, var float y0)->
 				with
 					await zombieDeath;
 					_printf("LALALALALA\n");
-					spawn PlayDeath();
+					spawn PlayKill();
 					//await 7s;
 				end
 				await 7s;
 			with
 				await pain;
 				spawn PlayPain();
-				await 1s;
 			end
-			
-			
 		end
 	
 	
@@ -448,35 +446,42 @@ code/await Player(var float x0, var float y0)->
         end
 
 	with   // RENDER
-		every SDL_REDRAW do	
-			var SDL_Rect clip_rect = call GetFrameRect(animationFrame);
-			
-			collider.x = xc;
-			collider.y = yc;
-	
-			fg.x = x;
-			fg.y = y;
-			
-			var SDL_Rect tmp = val SDL_Rect(fg.x - outer.camera.x,
-											fg.y - outer.camera.y,
-											playerSize as int, 
-											playerSize as int);
-			
-			_SDL_RenderCopyEx(  &&outer.sdl!.ren, 
-								&&outer.tx_player_recharge.tex.tex, 
-								&&clip_rect as _SDL_Rect&&,
-								&&tmp as _SDL_Rect&&, 
-								angle, null, _SDL_FLIP_NONE);
+		pause/if invFrames do
+			every SDL_REDRAW do	
+				var SDL_Rect clip_rect = call GetFrameRect(animationFrame, PL_TILE_SIZE,
+														   PL_FRAME_OFFSET_HORIZONTAL,
+														   PL_FRAME_OFFSET_VERTICAL,
+														   -2*PL_FRAME_OFFSET_HORIZONTAL,
+														   0);
+				
+				var SDL_Rect tmp = val SDL_Rect(fg.x - outer.camera.x,
+												fg.y - outer.camera.y,
+												playerSize as int, 
+												playerSize as int);
+				
+				_SDL_RenderCopyEx(  &&outer.sdl!.ren, 
+									&&outer.tx_player_recharge.tex.tex, 
+									&&clip_rect as _SDL_Rect&&,
+									&&tmp as _SDL_Rect&&, 
+									angle, null, _SDL_FLIP_NONE);
 
+			end
 		end
 	with
 		await die;
 	end
 	
+	if (_Mix_Playing(outer.voiceChannel) == 1) then
+		_Mix_HaltChannel(outer.voiceChannel);
+	end
 	spawn PlayVoice(&outer.snd_DEATH);
 	emit outer.playerDied;
 	_printf("MORREU\n");
-	var SDL_Rect clip_rect = call GetFrameRect(39);
+	var SDL_Rect clip_rect = call GetFrameRect(	39, PL_TILE_SIZE,
+												PL_FRAME_OFFSET_HORIZONTAL,
+												PL_FRAME_OFFSET_VERTICAL,
+												-2*PL_FRAME_OFFSET_HORIZONTAL,
+												0);
 	par do 
 		every SDL_REDRAW do	
 			
