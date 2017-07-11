@@ -256,8 +256,8 @@ code/await Player(var float x0, var float y0)->
 				go_y = false;
 			end
 			
-			var SDL_Rect tmp_x = val SDL_Rect(xcf, collider.y, playerSize as int, playerSize as int);
-			var SDL_Rect tmp_y = val SDL_Rect(collider.x, ycf, playerSize as int, playerSize as int);
+			var SDL_Rect tmp_x = val SDL_Rect(xcf, collider.y, collider.w, collider.h);
+			var SDL_Rect tmp_y = val SDL_Rect(collider.x, ycf, collider.w, collider.h);
 			
 			var&? ObstacleBlock block;
 			

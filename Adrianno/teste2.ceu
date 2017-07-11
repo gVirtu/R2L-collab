@@ -29,7 +29,15 @@ var&? SDL_Init sdl = spawn SDL_Init("Right 2 Live", SCREEN_WIDTH, SCREEN_HEIGHT,
 _SDL_ShowCursor(_SDL_DISABLE);
 
 #include "vecmath.ceu"
-#include "utils.ceu"
+
+//#include "utils.ceu"
+
+code/tight Intersects (var& SDL_Rect rct1, var& SDL_Rect rct2) -> bool do
+    escape rct1.x        <= rct2.x+rct2.w and
+           rct1.x+rct1.w >= rct2.x        and
+           rct1.y        <= rct2.y+rct2.h and
+           rct1.y+rct1.h >= rct2.y;
+end
 
 
 watching sdl do
@@ -135,9 +143,10 @@ watching sdl do
 							emit shot!.die;
 							emit z!.die;
 							emit p.zombieDeath;
+							break;
 						end
-					
 					end	
+					
 				end
 				
 			end

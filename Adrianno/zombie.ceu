@@ -1,0 +1,132 @@
+#define ZOMBIE_SIZE 40
+
+#define ZB_ANIM_WALK_START 0
+#define ZB_ANIM_WALK_END 30
+
+var& SDL_Open_Image tx_zombie = spawn SDL_Open_Image( &sdl!.ren, "res/spritesheet_zombie.png");
+
+code/await Zombie(var int x0, var int y0, var int speed) -> 
+				(var SDL_Rect collider, event void die) -> void do
+
+	collider = val SDL_Rect(x0, y0, ZOMBIE_SIZE, ZOMBIE_SIZE);
+	var int target_x = outer.p.playerOrigin_x as int;
+	var int target_y = outer.p.playerOrigin_y as int;
+	var int origin_x = 0;
+	var int origin_y = 0;
+
+	var int animationFrame = 0;
+	
+	code/tight NextFrame(var int f, var int max) -> int do
+		var int ret = f + 1;
+		if(ret == max) then
+			escape 0;
+		else
+			escape ret;
+		end
+	end
+
+	code/tight GetFrameRect(var int frame) -> SDL_Rect do
+		var SDL_Rect r = val SDL_Rect(  PL_TILE_SIZE*frame + PL_FRAME_OFFSET_HORIZONTAL,
+										PL_FRAME_OFFSET_VERTICAL,
+										PL_TILE_SIZE - 2*PL_FRAME_OFFSET_HORIZONTAL,
+										PL_TILE_SIZE );		
+		escape r;
+	end
+	
+	
+	
+	par/or do
+		var int dt = 0;
+		every dt in SDL_DT do
+			var bool go_x = true;
+			var bool go_y = true;
+			
+			// Get Target
+			origin_x = (collider.x + ZOMBIE_SIZE/2) as int;
+			origin_y = (collider.y + ZOMBIE_SIZE/2) as int;
+			target_x = outer.p.playerOrigin_x as int;
+			target_y = outer.p.playerOrigin_y as int;
+			
+			// Set Direction
+			var Vec2d dir = call Vec_GetDirection(	origin_x, 
+													origin_y, 
+													target_x,
+													target_y);
+													
+			//_printf("direction x = %f   y = %f\n", dir.x, dir.y);
+			dir.x = dir.x * speed;
+			dir.y = dir.y * speed;
+
+			// Test Collision
+			var int xf = (collider.x + dir.x) as int;
+			var int yf = (collider.y + dir.y) as int;
+	
+			
+			if xf < 0 or xf > LEVEL_WIDTH - ZOMBIE_SIZE then
+				go_x = false;
+			end
+			
+			if yf < 0 or yf > (LEVEL_HEIGHT - ZOMBIE_SIZE) then
+				go_y = false;
+			end
+			
+			var SDL_Rect tmp_x = val SDL_Rect(xf, collider.y, ZOMBIE_SIZE, ZOMBIE_SIZE);
+			var SDL_Rect tmp_y = val SDL_Rect(collider.x, yf, ZOMBIE_SIZE, ZOMBIE_SIZE);
+			
+			var&? ObstacleBlock block;
+
+			loop block in outer.roof do
+				if (call Intersects(&block!.surface, &tmp_x)) then
+					go_x = false;
+				end
+				if (call Intersects(&block!.surface, &tmp_y)) then
+					go_y = false;
+				end
+				if ( go_x == false) and (go_y == false) then
+					break;
+				end
+				
+			end
+			
+			if go_x then
+				collider.x = xf;
+			end
+			
+			if go_y then
+				collider.y = yf; 
+			end
+		
+			if(call Intersects(&collider, &outer.p.collider)) then
+				emit outer.zombieTouchPlayer;
+			end
+
+		end
+	with
+		every 1s do
+					// Set Direction
+			var Vec2d dir = call Vec_GetDirection(	origin_x, 
+													origin_y, 
+													target_x,
+													target_y);
+													
+			_printf("direction x = %f   y = %f\n", dir.x, dir.y);
+		end
+	with // ANIMATION
+		every 80ms do
+			
+		end
+	with
+		every SDL_REDRAW do
+			var SDL_Rect tmp = val SDL_Rect(collider.x - outer.camera.x,
+											collider.y - outer.camera.y,
+											ZOMBIE_SIZE, ZOMBIE_SIZE);
+			_SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0x00,0xFF,0x00,0xFF);
+			_SDL_RenderFillRect(&&outer.sdl!.ren, (&&tmp as _SDL_Rect&&));
+		end	
+	with
+		await die;
+	end
+	//_printf("BYEEEEEE\n");
+	//emit outer.p.zombieDeath;
+
+end
