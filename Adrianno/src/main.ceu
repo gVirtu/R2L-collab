@@ -51,7 +51,7 @@ _SDL_ShowCursor(_SDL_DISABLE);
 watching sdl do
 	{srand(time(NULL));}
 
-	_loadWorld("./res/maps/converted_100.map");
+	_loadWorld("./res/maps/converted.map");
 
 	native/const
         _world, _world_w, _world_h, 
@@ -146,16 +146,23 @@ watching sdl do
 		// ZOMBIE 
 		
 		#include "zombie.ceu"
-		pool[] Zombie zombies;
+		pool[150] Zombie zombies;
 		var int k;
 		
-		/*loop k in [0 -> 1] do
-			spawn Zombie(300 + k * 100, 300+ 3*k, 3) in zombies;
-		end*/
+		code/await Spawner(var int x, var int y) -> FOREVER do
+			var int interval = 5000;
+			loop do
+				spawn Zombie(x, y, 40 + (_rand()%100)) in outer.zombies;
+				interval = _clamp(interval - 50, 750, 5000);
+				await (interval)ms;
+			end
+		end
+
+		pool[] Spawner spawners;
 
 		loop i in [0 -> _zombies_count[ do
-			spawn Zombie(_zombies_x[i] * BLOCK_SIZE + (BLOCK_SIZE>>1), 
-						 _zombies_y[i] * BLOCK_SIZE + (BLOCK_SIZE>>1), 40 + (_rand()%100)) in zombies;
+			spawn Spawner(_zombies_x[i] * BLOCK_SIZE + (BLOCK_SIZE>>1), 
+						 _zombies_y[i] * BLOCK_SIZE + (BLOCK_SIZE>>1)) in spawners;
 		end
 
 		/*
