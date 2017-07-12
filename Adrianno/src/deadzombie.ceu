@@ -1,0 +1,88 @@
+#define CORPSE_SIZE 60
+
+#define CORPSE_TILE_SIZE 100
+#define CORPSE_OFFSET_PIXELS 5
+
+#define CORPSE_ANIM_DEATH_START 20
+#define CORPSE_ANIM_DEATH_END 30
+
+var& SDL_Open_Image tx_corpse = spawn SDL_Open_Image( &sdl!.ren, "res/spritesheet_zombie.png");
+
+code/await DeadZombie(var int x, var int y, var int angle) -> void do
+	
+
+	var SDL_Rect collider = val SDL_Rect(x, y, CORPSE_SIZE, CORPSE_SIZE);
+
+	// /*** ANIMATION **** /
+	var int animationFrame = CORPSE_ANIM_DEATH_START;
+
+	
+	code/tight NextFrame(var int f, var int max) -> int do
+		var int ret = f + 1;
+		if(ret == max) then
+			escape max;
+		else
+			escape ret;
+		end
+	end
+
+	code/tight GetFrameRect(var int frame) -> SDL_Rect do
+		var SDL_Rect r = val SDL_Rect(  CORPSE_TILE_SIZE * frame + CORPSE_OFFSET_PIXELS, 
+										CORPSE_OFFSET_PIXELS,
+										CORPSE_TILE_SIZE - 2 * CORPSE_OFFSET_PIXELS, 
+										CORPSE_TILE_SIZE - 2 * CORPSE_OFFSET_PIXELS );		
+		escape r;
+	end
+	
+	
+// /*	
+	
+	par/or do
+ // ANIMATION
+		every 120ms do
+			
+			if (animationFrame == CORPSE_ANIM_DEATH_END-1) then
+				break;
+			else
+				animationFrame = call NextFrame(animationFrame, CORPSE_ANIM_DEATH_END-1);
+			end
+		end
+	with
+		every SDL_REDRAW do
+			
+			var SDL_Rect clip_rect = call GetFrameRect(animationFrame);
+			
+			var SDL_Rect tmp = val SDL_Rect(collider.x - outer.camera.x,
+											collider.y - outer.camera.y,
+											CORPSE_SIZE, CORPSE_SIZE);
+			
+			_SDL_RenderCopyEx(  &&outer.sdl!.ren, 
+								&&outer.tx_corpse.tex.tex, 
+								&&clip_rect as _SDL_Rect&&,
+								&&tmp as _SDL_Rect&&, 
+								angle, null, _SDL_FLIP_NONE);
+		end	
+	end
+	// */	
+	var SDL_Rect clip_rect = call GetFrameRect(animationFrame);
+	
+	par/or do
+		await 15s;
+	with
+		every SDL_REDRAW do
+			var SDL_Rect tmp = val SDL_Rect(collider.x - outer.camera.x,
+										collider.y - outer.camera.y,
+										CORPSE_SIZE, CORPSE_SIZE);
+			_SDL_RenderCopyEx(  &&outer.sdl!.ren, 
+								&&outer.tx_corpse.tex.tex, 
+								&&clip_rect as _SDL_Rect&&,
+								&&tmp as _SDL_Rect&&, 
+								angle, null, _SDL_FLIP_NONE);
+		end	
+	end
+	
+	//_printf("BYEEEEEE\n");
+	//emit outer.p.zombieDeath;
+
+end
+

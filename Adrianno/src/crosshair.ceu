@@ -1,17 +1,11 @@
 var& SDL_Open_Image tx_crosshair = spawn SDL_Open_Image( &sdl!.ren, "res/crosshair_lowres.png");
 
-code/await Crosshair(void) -> void do
+code/await Crosshair(void) -> (var SDL_Rect ch) -> void do
 	
-	var SDL_Rect ch = val SDL_Rect(0, 0, outer.tx_crosshair.tex.width, outer.tx_crosshair.tex.height);
-	par do
-		var _SDL_MouseMotionEvent&& mse;
-		every mse in SDL_MOUSEMOTION do
-			ch.x = mse:x - ch.w/2;
-			ch.y = mse:y - ch.h/2;
-		end 
-	with
-		every SDL_REDRAW do
-			_SDL_RenderCopy(&&outer.sdl!.ren, &&outer.tx_crosshair.tex.tex, null, &&ch as _SDL_Rect&&);
-		end 
-	end
+	ch = val SDL_Rect(0, 0, outer.tx_crosshair.tex.width, outer.tx_crosshair.tex.height);
+	var _SDL_MouseMotionEvent&& mse;
+	every mse in SDL_MOUSEMOTION do
+		ch.x = mse:x - ch.w/2;
+		ch.y = mse:y - ch.h/2;
+	end 
 end

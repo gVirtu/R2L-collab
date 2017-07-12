@@ -55,6 +55,7 @@ var& SDL_Open_Image tx_player_idle = spawn SDL_Open_Image( &sdl!.ren, "res/char_
 code/await Player(var float x0, var float y0)-> 
 				(var float playerOrigin_x, 
 				var float playerOrigin_y, 
+				var int playerHealth,
 				event void zombieDeath,
 				event void zombieTouch,
 				var SDL_Rect collider,
@@ -64,7 +65,7 @@ code/await Player(var float x0, var float y0)->
 	/******** PLAYER **************/
 	//{
 	var float playerSize = 80.0;
-	var int playerHealth = 100;
+	playerHealth = 100;
 	
 	event void random;
 	event void shot;
@@ -319,6 +320,7 @@ code/await Player(var float x0, var float y0)->
 			playerHealth = playerHealth - 20;
 			_printf("AAAAAAAAAAAAAAAAAAAAAI\n");
 			_printf("Health: %d\n", playerHealth);
+			emit outer.healthHud!.health(playerHealth);
 			emit pain;
 			if playerHealth <= 0 then
 				emit die;

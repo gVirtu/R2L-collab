@@ -1,14 +1,20 @@
 #define ZOMBIE_SIZE 40
 
+#define ZB_TILE_SIZE 100
+#define ZB_OFFSET_PIXELS 20
+
 #define ZB_ANIM_WALK_START 0
-#define ZB_ANIM_WALK_END 22
-#define ZB_ANIM_DIE_START 22
-#define ZB_ANIM_DIE_END 30
+#define ZB_ANIM_WALK_END 20
 
 #define TRACE_DELAY 100
 #define COLLISION_DELAY 500
 #define APPEND_LIMIT 8
 #define CHASER_NO_OVERLAP 1
+#define CHASER_MAX_SQDIST 6000000
+
+var& SDL_Open_Sound snd_ZB_1 = spawn SDL_Open_Sound("res/snds/zumbi_1.wav");
+var& SDL_Open_Sound snd_ZB_2 = spawn SDL_Open_Sound("res/snds/zumbi_2.wav");
+var& SDL_Open_Sound snd_ZB_3 = spawn SDL_Open_Sound("res/snds/zumbi_3.wav");
 
 code/await ChaserRef(void) 
     -> (var u64 chID = 0, var SDL_Rect collision = val SDL_Rect(0,0, ZOMBIE_SIZE, ZOMBIE_SIZE), event void destroy) -> void do
@@ -17,22 +23,22 @@ end
 pool[] ChaserRef cRefs;
 
 var& SDL_Open_Image tx_zombie = spawn SDL_Open_Image( &sdl!.ren, "res/spritesheet_zombie.png");
+_SDL_SetTextureBlendMode(&&tx_zombie.tex.tex, _SDL_BLENDMODE_BLEND);
 
-code/await Zombie(var int x, var int y, var int speed) -> 
-				(var u64 chID = 0, var int hitPoints, var SDL_Rect collision, event (int, int) update_pf, event void die) -> void do
+code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -> 
+				(var u64 chID = 0, var int hitPoints, var float angle,
+				 var SDL_Rect collision, event (int, int) update_pf, event void die) -> void do
 
 	collision = val SDL_Rect(x, y, ZOMBIE_SIZE, ZOMBIE_SIZE);
 	var int target_x = outer.p.playerOrigin_x as int;
 	var int target_y = outer.p.playerOrigin_y as int;
-	var int origin_x = 0;
-	var int origin_y = 0;
 
 	var&? Pathfinder pf = spawn Pathfinder(x/BLOCK_SIZE, y/BLOCK_SIZE, target_x/BLOCK_SIZE, target_y/BLOCK_SIZE);
 	var&? ChaserRef ref = spawn ChaserRef() in outer.cRefs;
     chID = outer.chaserID;
     ref!.chID = chID;
     outer.chaserID = outer.chaserID + 1;
-	_printf("We have %lu chasers.\n", outer.chaserID);
+	//_printf("We have %lu chasers.\n", outer.chaserID);
 
 	var int pathstep = 1;
     var int appended = 0;
@@ -43,6 +49,7 @@ code/await Zombie(var int x, var int y, var int speed) ->
     var int debugy = y;
 
 	var bool debugMe = false;
+	var float alpha = 0.0;
 
 	event bool ev_reverseX;
 	event bool ev_reverseY;
@@ -50,9 +57,10 @@ code/await Zombie(var int x, var int y, var int speed) ->
 	var bool reverseX = false;
 	var bool reverseY = false;
 
-	hitPoints = 2;
+	hitPoints = startHitPoints;
 
 	var int animationFrame = 0;
+	angle = 0;
 	
 	code/tight NextFrame(var int f, var int max) -> int do
 		var int ret = f + 1;
@@ -64,11 +72,45 @@ code/await Zombie(var int x, var int y, var int speed) ->
 	end
 
 	code/tight GetFrameRect(var int frame) -> SDL_Rect do
-		var SDL_Rect r = val SDL_Rect(  PL_TILE_SIZE*frame + PL_FRAME_OFFSET_HORIZONTAL,
-										PL_FRAME_OFFSET_VERTICAL,
-										PL_TILE_SIZE - 2*PL_FRAME_OFFSET_HORIZONTAL,
-										PL_TILE_SIZE );		
+		var SDL_Rect r = val SDL_Rect(  ZB_TILE_SIZE * frame + ZB_OFFSET_PIXELS, 
+										ZB_OFFSET_PIXELS,
+										ZB_TILE_SIZE - 2 * ZB_OFFSET_PIXELS, 
+										ZB_TILE_SIZE - 2 * ZB_OFFSET_PIXELS );		
 		escape r;
+	end
+
+	code/tight GetSqDistance(void) -> int do
+		var int xx = outer.x - (outer.p.playerOrigin_x as int);
+		var int yy = outer.y - (outer.p.playerOrigin_y as int);
+		escape (xx*xx)+(yy*yy);
+	end
+
+	code/await PlayVoice(var& SDL_Open_Sound snd) -> void do
+		_Mix_PlayChannel(-1, &&snd.sound, 0);
+		await 1 s;
+	end
+
+	code/await PlayRandom(void) -> void do
+		var int tmp = _rand()%2;
+
+		if ((outer.x - outer.camera.x > 0) and
+			(outer.x - outer.camera.x < SCREEN_WIDTH) and
+			(outer.y - outer.camera.y > 0) and
+			(outer.y - outer.camera.y < SCREEN_HEIGHT)) then
+
+			if(tmp == 1) then
+				_printf("ZOMBIRRRL\n");
+				var int voice = (_rand()%3);
+				if(voice == 0) then
+					spawn PlayVoice(&outer.snd_ZB_1);
+				else/if(voice == 1) then
+					spawn PlayVoice(&outer.snd_ZB_2);
+				else
+					spawn PlayVoice(&outer.snd_ZB_3);
+				end
+				await 10s; 
+			end
+		end
 	end
 
 	var bool lineOfSight = false;
@@ -102,223 +144,248 @@ code/await Zombie(var int x, var int y, var int speed) ->
 			emit ev_reverseY(false);
 		end 
 	with
+		//Fade in
+		loop _ in [0->85[ do
+			await SDL_DT;
+			alpha = alpha + 3.0;
+		end
 		var int dt = 0;
 		every dt in SDL_DT do
-            var int v = speed * dt/1000;
-            //Test line of sight
-            var int losX;
-            var int losY;
-			var int xmoved = 0;
-			var int ymoved = 0;
-            losX = outer.p.playerOrigin_x as int;
-            losY = outer.p.playerOrigin_y as int;
-            var bool canMoveX = true;
-            var bool canMoveY = true;
+			// Test player collision
+			if(call Intersects(&collision, &outer.p.collider)) then
+				emit outer.zombieTouchPlayer;
+			end
+		end
+	with
+		var int dt = 0;
+		every dt in SDL_DT do
+			if (call GetSqDistance() < CHASER_MAX_SQDIST) then
+				var int v = speed * dt/1000;
+				//Test line of sight
+				var int losX;
+				var int losY;
+				var int xmoved = 0;
+				var int ymoved = 0;
+				losX = outer.p.playerOrigin_x as int;
+				losY = outer.p.playerOrigin_y as int;
+				var bool canMoveX = true;
+				var bool canMoveY = true;
 
-            var&? CollisionBlock block;
-            
-            /*
-            if (not lineOfSight) then 
-                var&? ChaserRef friend;
-                var bool canFollow = false;
-                loop friend in outer.cRefs do  
-                    if (chID<friend!.chID) then
-                        canFollow = true;
-                        loop block in outer.blocks do
-                            var int x1 = collision.x+(ZOMBIE_SIZE>>1);
-                            var int y1 = collision.y+(ZOMBIE_SIZE>>1);
-                            var int x2 = friend!.collision.x+(ZOMBIE_SIZE>>1);
-                            var int y2 = friend!.collision.y+(ZOMBIE_SIZE>>1);
-                            if (_SDL_IntersectRectAndLine(&&block!.collision as _SDL_Rect&&, 
-                                                            &&x1, &&y1, &&x2, &&y2) == _SDL_TRUE) then 
-                                canFollow = false;
-                                break;
-                            end
-                        end
+				var&? CollisionBlock block;
+				
+				/*
+				if (not lineOfSight) then 
+					var&? ChaserRef friend;
+					var bool canFollow = false;
+					loop friend in outer.cRefs do  
+						if (chID<friend!.chID) then
+							canFollow = true;
+							loop block in outer.blocks do
+								var int x1 = collision.x+(ZOMBIE_SIZE>>1);
+								var int y1 = collision.y+(ZOMBIE_SIZE>>1);
+								var int x2 = friend!.collision.x+(ZOMBIE_SIZE>>1);
+								var int y2 = friend!.collision.y+(ZOMBIE_SIZE>>1);
+								if (_SDL_IntersectRectAndLine(&&block!.collision as _SDL_Rect&&, 
+																&&x1, &&y1, &&x2, &&y2) == _SDL_TRUE) then 
+									canFollow = false;
+									break;
+								end
+							end
 
-                        if (canFollow) then
-                            losX = friend!.collision.x+(ZOMBIE_SIZE>>1);
-                            losY = friend!.collision.y+(ZOMBIE_SIZE>>1);
-                            lineOfSight = true;
-                            break;
-                        end
-                    end
-                end
-            end*/
+							if (canFollow) then
+								losX = friend!.collision.x+(ZOMBIE_SIZE>>1);
+								losY = friend!.collision.y+(ZOMBIE_SIZE>>1);
+								lineOfSight = true;
+								break;
+							end
+						end
+					end
+				end*/
 
-            if (lineOfSight) then 
-                debugx = losX;
-                debugy = losY;
+				if (lineOfSight) then 
+					target_x = losX;
+					target_y = losY;
 
-                var int dx = losX - x;
-                var int dy = losY - y;
+					var int dx = losX - x;
+					var int dy = losY - y;
 
-                if (_abs(dx) >= v) then 
-					xmoved = _sign(dx)*v; 
-                    x = x + xmoved;
-                else
-					x = losX;
+					if (_abs(dx) >= v) then 
+						xmoved = _sign(dx)*v; 
+						x = x + xmoved;
+					else
+						x = losX;
+					end 
+					if (_abs(dy) >= v) then 
+						ymoved = _sign(dy)*v; 
+						y = y + ymoved;
+					else
+						y = losY;
+					end 
+					//_printf("LOS ON :))))\n");
+					pf!.path = [];
+					/*var int dd = (dx*dx + dy*dy)/100;
+					var int dcos = (dx*dx)/(dd);
+					var int dsin = (dy*dy)/(dd);
+
+					_printf("(X,Y) = (%d,%d); (DX,DY) = (%d,%d); (DCOS, DSIN) = (%d, %d)\n", x, y, dx, dy, dcos, dsin);
+					
+					x = x + ((_sign(dx) * dcos * v)/100);
+					y = y + ((_sign(dy) * dsin * v)/100);*/
+				else 
+				//Follow A* path instead
+					//_printf("LOS OFF DDDDDD: (Step: %d of %d)\n", pathstep, $pf!.path);
+					if (pathstep < $pf!.path) then
+						target_x = (BLOCK_SIZE>>1) + pf!.path[pathstep].x * BLOCK_SIZE; 
+						target_y = (BLOCK_SIZE>>1) + pf!.path[pathstep].y * BLOCK_SIZE;
+
+						var int dx = (target_x) - x;
+						var int dy = (target_y) - y;
+
+						//_printf("DX=%d and DY=%d and V=%d\n", dx, dy, v);
+						if (_abs(dx) + _abs(dy) < v) then
+							pathstep = pathstep + 1;
+						else 
+							if (_abs(dx) >= v) then 
+								xmoved = _sign(dx)*v; 
+								x = x + xmoved;
+							else
+								xmoved = target_x - x;
+								x = target_x;
+							end 
+							if (_abs(dy) >= v) then 
+								ymoved = _sign(dy)*v; 
+								y = y + ymoved;
+							else
+								ymoved = target_y - y;
+								y = target_y;
+							end 
+						end
+					else
+						//if ($pf!.path == 0) then
+						//Because we aren't in line of sight, this shouldn't be called over and over
+							appended = APPEND_LIMIT;
+							emit update_pf((outer.p.playerOrigin_x as int)/BLOCK_SIZE, (outer.p.playerOrigin_y as int)/BLOCK_SIZE);
+						//end
+					end
 				end 
-                if (_abs(dy) >= v) then 
-					ymoved = _sign(dy)*v; 
-                    y = y + ymoved;
-                else
-					y = losY;
+
+				#ifdef CHASER_NO_OVERLAP
+				var&? ChaserRef cr;
+				loop cr in outer.cRefs do
+					if (cr!.chID > chID) then
+						var SDL_Rect collision_shifted = collision;
+						collision_shifted.x = x - ZOMBIE_SIZE/2;
+						if (call Intersects(&cr!.collision, &collision_shifted)) then 
+							//canMoveX = false;
+							emit ev_reverseX(true);
+							break;
+						end
+					end 
+				end
+				#endif
+
+				if (reverseX) then
+					x = x - 2*xmoved;
+					xmoved = -xmoved;
+				end
+
+				var int nextLX = (x-(ZOMBIE_SIZE>>1)-1)/BLOCK_SIZE;
+				var int nextRX = (x+(ZOMBIE_SIZE>>1)+1)/BLOCK_SIZE;
+				var int gridTY = (collision.y+1)/BLOCK_SIZE;
+				var int gridBY = (collision.y+ZOMBIE_SIZE-1)/BLOCK_SIZE;
+
+				//Going left?
+				if (xmoved<0 and 
+					(_world[nextLX + gridTY*_world_w] >= 100 or
+					_world[nextLX + gridBY*_world_w] >= 100)) then
+					//if (debugMe) then 
+					//	_printf("Cannot move X because of left edge. LX=%d, TY=%d, BY=%d, WT=%d, WB=%d\n", 
+					//			nextLX, gridTY, gridBY, _world[nextLX + gridTY*_world_w], _world[nextLX + gridBY*_world_w]);
+					//end
+					canMoveX = false;
+				end
+
+				//Going right?
+				if (xmoved>0 and 
+					(_world[nextRX + gridTY*_world_w] >= 100 or
+					_world[nextRX + gridBY*_world_w] >= 100)) then
+					//if (debugMe) then 
+					//	_printf("Cannot move X because of right edge. RX=%d, TY=%d, BY=%d, WT=%d, WB=%d\n", 
+					//			nextRX, gridTY, gridBY, _world[nextRX + gridTY*_world_w], _world[nextRX + gridBY*_world_w]);
+					//end
+					canMoveX = false;
+				end
+
+				#ifdef CHASER_NO_OVERLAP
+				loop cr in outer.cRefs do
+					if (cr!.chID > chID) then
+						var SDL_Rect collision_shifted = collision;
+						collision_shifted.y = y - ZOMBIE_SIZE/2;
+						if (call Intersects(&cr!.collision, &collision_shifted)) then 
+							//canMoveY = false;
+							emit ev_reverseY(true);
+							break;
+						end
+					end
+				end
+				#endif
+
+				if (reverseY) then
+					y = y - 2*ymoved;
+					ymoved = -ymoved;
+				end
+
+				var int nextUY = (y-(ZOMBIE_SIZE>>1)-1)/BLOCK_SIZE;
+				var int nextDY = (y+(ZOMBIE_SIZE>>1)+1)/BLOCK_SIZE;
+				var int gridLX = (collision.x+1)/BLOCK_SIZE;
+				var int gridRX = (collision.x+ZOMBIE_SIZE-1)/BLOCK_SIZE;
+
+				//Going up?
+				if (ymoved<0 and 
+					(_world[gridLX + nextUY*_world_w] >= 100 or
+					_world[gridRX + nextUY*_world_w] >= 100)) then
+					//if (debugMe) then 
+					//	_printf("Cannot move Y because of upper edge. UY=%d, LX=%d, RX=%d, WL=%d, WR=%d\n", 
+					//			nextUY, gridLX, gridRX, _world[gridLX + nextUY*_world_w], _world[gridRX + nextUY*_world_w]);
+					//end
+					canMoveY = false;
+				end
+
+				//Going down?
+				if (ymoved>0 and
+					(_world[gridLX + nextDY*_world_w] >= 100 or
+					_world[gridRX + nextDY*_world_w] >= 100)) then
+					//if (debugMe) then 
+					//	_printf("Cannot move Y because of bottom edge. DY=%d, LX=%d, RX=%d, WL=%d, WR=%d\n", 
+					//			nextDY, gridLX, gridRX, _world[gridLX + nextDY*_world_w], _world[gridRX + nextDY*_world_w]);
+					//end
+					canMoveY = false;
+				end
+
+				if (canMoveX) then
+					collision.x = x - ZOMBIE_SIZE/2;
+				else
+					x = collision.x + ZOMBIE_SIZE/2;
 				end 
-                //_printf("LOS ON :))))\n");
-                pf!.path = [];
-                /*var int dd = (dx*dx + dy*dy)/100;
-                var int dcos = (dx*dx)/(dd);
-                var int dsin = (dy*dy)/(dd);
+				if (canMoveY) then
+					collision.y = y - ZOMBIE_SIZE/2;
+				else
+					y = collision.y + ZOMBIE_SIZE/2;
+				end 
 
-                _printf("(X,Y) = (%d,%d); (DX,DY) = (%d,%d); (DCOS, DSIN) = (%d, %d)\n", x, y, dx, dy, dcos, dsin);
-                
-                x = x + ((_sign(dx) * dcos * v)/100);
-                y = y + ((_sign(dy) * dsin * v)/100);*/
-            else 
-            //Follow A* path instead
-                //_printf("LOS OFF DDDDDD: (Step: %d of %d)\n", pathstep, $pf!.path);
-                if (pathstep < $pf!.path) then
-                    target_x = (BLOCK_SIZE>>1) + pf!.path[pathstep].x * BLOCK_SIZE; 
-                    target_y = (BLOCK_SIZE>>1) + pf!.path[pathstep].y * BLOCK_SIZE;
+				ref!.collision = collision;
 
-                    var int dx = (target_x) - x;
-                    var int dy = (target_y) - y;
-
-					//_printf("DX=%d and DY=%d and V=%d\n", dx, dy, v);
-                    if (_abs(dx) + _abs(dy) < v) then
-                        pathstep = pathstep + 1;
-                    else 
-                        if (_abs(dx) >= v) then 
-                            xmoved = _sign(dx)*v; 
-                    		x = x + xmoved;
-						else
-							xmoved = target_x - x;
-							x = target_x;
-                        end 
-                        if (_abs(dy) >= v) then 
-							ymoved = _sign(dy)*v; 
-                    		y = y + ymoved;
-						else
-							ymoved = target_y - y;
-							y = target_y;
-                        end 
-                    end
-                else
-                    //if ($pf!.path == 0) then
-					//Because we aren't in line of sight, this shouldn't be called over and over
-                        appended = APPEND_LIMIT;
-                        emit update_pf((outer.p.playerOrigin_x as int)/BLOCK_SIZE, (outer.p.playerOrigin_y as int)/BLOCK_SIZE);
-                    //end
-                end
-            end 
-
-			#ifdef CHASER_NO_OVERLAP
-            var&? ChaserRef cr;
-            loop cr in outer.cRefs do
-                if (cr!.chID > chID) then
-                    var SDL_Rect collision_shifted = collision;
-                    collision_shifted.x = x - ZOMBIE_SIZE/2;
-                    if (call Intersects(&cr!.collision, &collision_shifted)) then 
-                        //canMoveX = false;
-						emit ev_reverseX(true);
-                        break;
-                    end
-                end 
-            end
-            #endif
-
-			if (reverseX) then
-				x = x - 2*xmoved;
-				xmoved = -xmoved;
+				// Set Direction and angle
+				if (target_x != x or target_y != y) then
+					var Vec2d dir = call Vec_GetDirection(	x, 
+															y, 
+															target_x,
+															target_y);
+					var Vec2d yaxis = call Vec_GetDirection( 0, 0, 0, -1);
+					angle = call Vec_AngleBetween(yaxis, dir);
+				end
 			end
-
-            var int nextLX = (x-(ZOMBIE_SIZE>>1)-1)/BLOCK_SIZE;
-            var int nextRX = (x+(ZOMBIE_SIZE>>1)+1)/BLOCK_SIZE;
-            var int gridTY = (collision.y+1)/BLOCK_SIZE;
-            var int gridBY = (collision.y+ZOMBIE_SIZE-1)/BLOCK_SIZE;
-
-			//Going left?
-			if (xmoved<0 and 
-				(_world[nextLX + gridTY*_world_w] >= 100 or
-				_world[nextLX + gridBY*_world_w] >= 100)) then
-				//if (debugMe) then 
-				//	_printf("Cannot move X because of left edge. LX=%d, TY=%d, BY=%d, WT=%d, WB=%d\n", 
-				//			nextLX, gridTY, gridBY, _world[nextLX + gridTY*_world_w], _world[nextLX + gridBY*_world_w]);
-				//end
-				canMoveX = false;
-			end
-
-			//Going right?
-			if (xmoved>0 and 
-				(_world[nextRX + gridTY*_world_w] >= 100 or
-				 _world[nextRX + gridBY*_world_w] >= 100)) then
-				 //if (debugMe) then 
-				//	_printf("Cannot move X because of right edge. RX=%d, TY=%d, BY=%d, WT=%d, WB=%d\n", 
-				//			nextRX, gridTY, gridBY, _world[nextRX + gridTY*_world_w], _world[nextRX + gridBY*_world_w]);
-				//end
-				canMoveX = false;
-			end
-
-			#ifdef CHASER_NO_OVERLAP
-            loop cr in outer.cRefs do
-                if (cr!.chID > chID) then
-                    var SDL_Rect collision_shifted = collision;
-                    collision_shifted.y = y - ZOMBIE_SIZE/2;
-                    if (call Intersects(&cr!.collision, &collision_shifted)) then 
-                        //canMoveY = false;
-						emit ev_reverseY(true);
-                        break;
-                    end
-                end
-            end
-            #endif
-
-			if (reverseY) then
-				y = y - 2*ymoved;
-				ymoved = -ymoved;
-			end
-
-            var int nextUY = (y-(ZOMBIE_SIZE>>1)-1)/BLOCK_SIZE;
-            var int nextDY = (y+(ZOMBIE_SIZE>>1)+1)/BLOCK_SIZE;
-            var int gridLX = (collision.x+1)/BLOCK_SIZE;
-            var int gridRX = (collision.x+ZOMBIE_SIZE-1)/BLOCK_SIZE;
-
-			//Going up?
-			if (ymoved<0 and 
-				(_world[gridLX + nextUY*_world_w] >= 100 or
-				 _world[gridRX + nextUY*_world_w] >= 100)) then
-				 //if (debugMe) then 
-				//	_printf("Cannot move Y because of upper edge. UY=%d, LX=%d, RX=%d, WL=%d, WR=%d\n", 
-				//			nextUY, gridLX, gridRX, _world[gridLX + nextUY*_world_w], _world[gridRX + nextUY*_world_w]);
-				//end
-				canMoveY = false;
-			end
-
-			//Going down?
-			if (ymoved>0 and
-				(_world[gridLX + nextDY*_world_w] >= 100 or
-				 _world[gridRX + nextDY*_world_w] >= 100)) then
-				 //if (debugMe) then 
-				//	_printf("Cannot move Y because of bottom edge. DY=%d, LX=%d, RX=%d, WL=%d, WR=%d\n", 
-				//			nextDY, gridLX, gridRX, _world[gridLX + nextDY*_world_w], _world[gridRX + nextDY*_world_w]);
-				//end
-				canMoveY = false;
-			end
-
-            if (canMoveX) then
-                collision.x = x - ZOMBIE_SIZE/2;
-            else
-                x = collision.x + ZOMBIE_SIZE/2;
-            end 
-            if (canMoveY) then
-                collision.y = y - ZOMBIE_SIZE/2;
-            else
-                y = collision.y + ZOMBIE_SIZE/2;
-            end 
-
-            ref!.collision = collision;
-        end
+		end
 		/*every dt in SDL_DT do
 			
 			var bool go_x = true;
@@ -379,9 +446,6 @@ code/await Zombie(var int x, var int y, var int speed) ->
 				collision.y = yf; 
 			end
 		
-			if(call Intersects(&collision, &outer.p.collision)) then
-				emit outer.zombieTouchPlayer;
-			end
 			
 		end*/
 	with 
@@ -419,32 +483,55 @@ code/await Zombie(var int x, var int y, var int speed) ->
             var int gy;
             (gx, gy) = await update_pf;
 			//_printf("TIME TO UPDATE_PF(%d, %d)\n", gx, gy);
-            if (appended < APPEND_LIMIT) then 
-                appended = appended + 1;
-                var PathNode newNode = val PathNode(gx, gy);
-                pf!.path = pf!.path .. [newNode];
-            else
-                emit pf!.do_retarget(x/BLOCK_SIZE,y/BLOCK_SIZE,gx,gy);
-                pathstep = 1;
-                await (TRACE_DELAY)ms;
-                appended = 0;
-            end
+			if (call GetSqDistance() < CHASER_MAX_SQDIST) then
+				if (appended < APPEND_LIMIT) then 
+					appended = appended + 1;
+					var PathNode newNode = val PathNode(gx, gy);
+					pf!.path = pf!.path .. [newNode];
+				else
+					emit pf!.do_retarget(x/BLOCK_SIZE,y/BLOCK_SIZE,gx,gy);
+					pathstep = 1;
+					await (TRACE_DELAY)ms;
+					appended = 0;
+				end
+			end
         end 
 	with
-		every 1s do
-					// Set Direction
-			var Vec2d dir = call Vec_GetDirection(	origin_x, 
-													origin_y, 
-													target_x,
-													target_y);
-													
-			//_printf("direction x = %f   y = %f\n", dir.x, dir.y);
+		loop do
+			await ((_rand()%3000))ms;
+			spawn PlayRandom();
+			await 3s;
 		end
 	with // ANIMATION
 		every 80ms do
-			
+			animationFrame = call NextFrame(animationFrame, ZB_ANIM_WALK_END-1);
 		end
 	with
+		every SDL_REDRAW do
+			if (call GetSqDistance() < CHASER_MAX_SQDIST) then
+				var SDL_Rect clip_rect = call GetFrameRect(animationFrame);
+				
+				var SDL_Rect tmp = val SDL_Rect(collision.x - outer.camera.x,
+												collision.y - outer.camera.y,
+												ZOMBIE_SIZE, ZOMBIE_SIZE);
+				
+				_SDL_SetTextureAlphaMod(&&outer.tx_zombie.tex.tex, alpha);
+				_SDL_RenderCopyEx(  &&outer.sdl!.ren, 
+									&&outer.tx_zombie.tex.tex, 
+									&&clip_rect as _SDL_Rect&&,
+									&&tmp as _SDL_Rect&&, 
+									angle, null, _SDL_FLIP_NONE);
+				_SDL_SetTextureAlphaMod(&&outer.tx_zombie.tex.tex, alpha);
+			end
+
+			//_SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0x00,0x00,0xFF,0xFF);
+			//_SDL_RenderDrawLine(&&outer.sdl!.ren, 
+            //                            x - outer.camera.x, 
+            //                            y - outer.camera.y,
+            //                            outer.p.playerOrigin_x - outer.camera.x, 
+            //                            outer.p.playerOrigin_y - outer.camera.y);
+		end	
+		/*
 		every SDL_REDRAW do
 			var SDL_Rect tmp = val SDL_Rect(collision.x - outer.camera.x,
 											collision.y - outer.camera.y,
@@ -458,12 +545,12 @@ code/await Zombie(var int x, var int y, var int speed) ->
 				_SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0x00,0xFF,0x00,0xFF);
 			//end
 			_SDL_RenderFillRect(&&outer.sdl!.ren, (&&tmp as _SDL_Rect&&));
-			/*_SDL_RenderDrawLine(&&outer.sdl!.ren, 
-                                        x - outer.camera.x, 
-                                        y - outer.camera.y,
-                                        target_x - outer.camera.x, 
-                                        target_y - outer.camera.y);*/
-		end	
+			//_SDL_RenderDrawLine(&&outer.sdl!.ren, 
+            //                            x - outer.camera.x, 
+            //                            y - outer.camera.y,
+            //                            target_x - outer.camera.x, 
+            //                            target_y - outer.camera.y);
+		end*/
 	with
 		await die;
 	end

@@ -2,7 +2,7 @@
 #include "c.ceu"
 #include "utils.ceu"
 
-#define CEU_SDL_MODE_FRAME (1000/60)
+#define CEU_SDL_MODE_FRAME (1000/30)
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
@@ -28,6 +28,8 @@ native/nohold
     _SDL_RenderCopyEx,
 	_SDL_ShowCursor,
     _SDL_GetKeyboardState,
+	_SDL_SetTextureAlphaMod,
+	_SDL_SetTextureBlendMode,
     _SDL_IntersectRectAndLine,
     _ASPathCreate,
     _ASPathGetCount,
@@ -51,12 +53,14 @@ _SDL_ShowCursor(_SDL_DISABLE);
 watching sdl do
 	{srand(time(NULL));}
 
-	_loadWorld("./res/maps/converted.map");
+	_loadWorld("./res/maps/final.map");
 
 	native/const
         _world, _world_w, _world_h, 
 		_player_x, _player_y,
         _zombies_x, _zombies_y, _zombies_count;
+
+	var& SDL_Open_Font font = spawn SDL_Open_Font("./res/BloodLust.ttf", 80);
 
 	//CAMERA
 	var SDL_Rect camera = val SDL_Rect( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT );
@@ -67,8 +71,6 @@ watching sdl do
 	
 	//MAP
 	#include "floorblock.ceu"
-	pool[] ObstacleBlock roof;
-	pool[] FloorBlock floor;
 	pool[] CollisionBlock blocks;
 
 	var int level_width  = _world_w * BLOCK_SIZE;
@@ -78,6 +80,8 @@ watching sdl do
     var int j;
     var int w=1;
     _printf("%d x %d with %d\n", _world_w, _world_h, _zombies_count);
+
+	chaserID = 0;
 	//WORLD GENERATION
     loop i in [0 -> _world_h[ do
         loop j in [0 -> _world_w[ do
@@ -93,7 +97,7 @@ watching sdl do
                 end 
 
 				//Aesthetics
-				if (currentTile >= 120) then
+				/*if (currentTile >= 120) then
 					//Roof edges
 					spawn ObstacleBlock(j, i, &tx_ROOF_EDGE, 90*(currentTile-120)) in roof;
 				else/if (currentTile >= 110) then
@@ -102,8 +106,8 @@ watching sdl do
 				else
 					//Box
 					spawn ObstacleBlock(j, i, &tx_CRATES, 0) in roof;
-				end
-			else
+				end*/
+			/*else
 				//Aesthetics
 				if (currentTile >= 20) then
 					//Sidewalk edges
@@ -114,11 +118,14 @@ watching sdl do
 				else/if (currentTile==1) then
 					//Asphalt
 					spawn FloorBlock(j, i, &tx_ASPHALT, 0) in floor;
-				end
+				end*/
             end
             // { printf("%d ", world[@j + (@i * WORLD_W)]); }
         end
     end
+
+	#include "bghelper.ceu"
+	spawn BGHelper();
 
 	//EVENTS
 	event void zombieTouchPlayer;
@@ -128,32 +135,42 @@ watching sdl do
 	//SOUNDTRACK
 	_Mix_ReserveChannels(1);
 	var int voiceChannel = 0;
-	var& SDL_Open_Sound snd_music = spawn SDL_Open_Sound("res/snds/soundtrack_bg2.wav");
+	var& SDL_Open_Sound snd_music = spawn SDL_Open_Sound("res/snds/soundtrack_bg.wav");
 	_Mix_PlayChannel(-1, &&snd_music.sound, -1);
 	
 	loop do
 
+		#include "deadzombie.ceu"
+		pool[100] DeadZombie corpses;
+
 		// SHOT
-		
 		#include "shot.ceu"
-		pool[] Shot shots;	
+		pool[20] Shot shots;	
+
+		#include "healthbar.ceu"
+		var&? HealthHUD healthHud = spawn HealthHUD();
 		
 		//PLAYER
 		#include "player.ceu"
 		var& Player p = spawn Player(_player_x * BLOCK_SIZE + (BLOCK_SIZE>>1), 
 									 _player_y * BLOCK_SIZE + (BLOCK_SIZE>>1));
 
+		var u64 kills = 0;
+
 		// ZOMBIE 
 		
 		#include "zombie.ceu"
-		pool[150] Zombie zombies;
+		pool[50] Zombie zombies;
 		var int k;
 		
-		code/await Spawner(var int x, var int y) -> FOREVER do
+		code/await Spawner(var int x, var int y, var int offset) -> FOREVER do
 			var int interval = 5000;
+			var float zhp = 1.0;
 			loop do
-				spawn Zombie(x, y, 40 + (_rand()%100)) in outer.zombies;
+				await (offset)ms;
+				spawn Zombie(x, y, 40 + (_rand()%100), zhp as int) in outer.zombies;
 				interval = _clamp(interval - 50, 750, 5000);
+				zhp = zhp + 0.3;
 				await (interval)ms;
 			end
 		end
@@ -162,7 +179,7 @@ watching sdl do
 
 		loop i in [0 -> _zombies_count[ do
 			spawn Spawner(_zombies_x[i] * BLOCK_SIZE + (BLOCK_SIZE>>1), 
-						 _zombies_y[i] * BLOCK_SIZE + (BLOCK_SIZE>>1)) in spawners;
+						 _zombies_y[i] * BLOCK_SIZE + (BLOCK_SIZE>>1), _rand()%2500) in spawners;
 		end
 
 		/*
@@ -194,7 +211,10 @@ watching sdl do
 		
 			
 		#include "crosshair.ceu"
-		spawn Crosshair();
+		var&? Crosshair crosshair = spawn Crosshair();
+
+		#include "renderhelper.ceu"
+		spawn RenderHelper();
 		
 		//pool[] Render l1;
 		
@@ -228,6 +248,8 @@ watching sdl do
 						if (shot? and z? and call Intersects(&shot!.obj, &z!.collision)) then
 							z!.hitPoints = z!.hitPoints - 1;
 							if (z!.hitPoints < 1) then 
+								spawn DeadZombie(z!.collision.x, z!.collision.y, z!.angle as int) in corpses;
+								kills = kills + 1;
 								emit z!.die;
 								emit p.zombieDeath;
 							end 
@@ -258,6 +280,7 @@ watching sdl do
 
 		end
 		
+		_printf("Voce acabou com %lu zumbis.\n", kills);
 		_printf("clique na tela para continuar\n");
 		var _SDL_MouseButtonEvent&& mb;
 		mb = await SDL_MOUSEBUTTONDOWN until mb:button == _SDL_BUTTON_LEFT;

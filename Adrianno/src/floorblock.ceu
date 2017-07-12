@@ -80,8 +80,8 @@ code/await FloorBlock(	var int idx_x, var int idx_y,
 end
 
 
-code/await ObstacleBlock( var int idx_x, var int idx_y, var&? SDL_Open_Image img, var int angle) -> 
-		(var SDL_Rect surface) -> FOREVER do
+code/await ObstacleBlock( var int idx_x, var int idx_y, var&? SDL_Open_Image img, var int startangle) -> 
+		(var SDL_Rect surface, var int angle, var SDL_Texture imgtex) -> FOREVER do
 	
  	code/tight X_pixel( var int idx_x ) -> int do
 		escape ((idx_x * BLOCK_SIZE) as int);
@@ -93,24 +93,10 @@ code/await ObstacleBlock( var int idx_x, var int idx_y, var&? SDL_Open_Image img
 
 	var int px = call X_pixel(idx_x);
 	var int py = call Y_pixel(idx_y);
+	angle = startangle;
+	imgtex = img!.tex;
 	
 	surface = val SDL_Rect(px,py,BLOCK_SIZE,BLOCK_SIZE);
-	every SDL_REDRAW do
-
-		//spawn Render(surface.x, surface.y, &img, angle) in outer.l1;
-	
-		//await outer.renderedPlayer until 1 ms; 
-		var SDL_Rect tmp = val SDL_Rect(surface.x - outer.camera.x,
-										surface.y - outer.camera.y,
-										BLOCK_SIZE, BLOCK_SIZE);
-										
-		_SDL_RenderCopyEx(  &&outer.sdl!.ren, 
-							&&img!.tex.tex, 
-							null, &&tmp as _SDL_Rect&&, 
-							angle, null, _SDL_FLIP_NONE);
-							
-		//_SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0x00,0xFF,0x00,0xFF);
-		//_SDL_RenderFillRect(&&outer.sdl!.ren, (&&tmp as _SDL_Rect&&));
-	end
+	await FOREVER;
 end
 

@@ -1,0 +1,55 @@
+#define BAR_START_X 100
+#define BAR_START_Y 20
+#define BAR_HEIGHT 30
+#define BAR_FULL_WIDTH 300
+#define BAR_MAX_HEALTH 100
+
+code/await HealthHUD(void) -> (event int health, var SDL_Rect bar, var SDL_Rect b1, var SDL_Rect b2, var SDL_Rect b3, var SDL_Rect b4,
+								 var int r, var int g, var int r2, var int g2) -> void do
+
+	bar = val SDL_Rect(BAR_START_X,
+						BAR_START_Y, 
+						BAR_FULL_WIDTH,
+						BAR_HEIGHT);
+
+	b1 = val SDL_Rect(45, 20, 10, 30);         
+	b2 = val SDL_Rect(35, 30, 30, 10);
+	b3 = val SDL_Rect(51, 26, 10, 30);         
+	b4 = val SDL_Rect(41, 36, 30, 10);
+	var int h = 0;
+	r = 0x00;
+	g = 0xFF;	
+	r2 = 0x00;
+	g2 = 0x44;	
+	
+	code/tight HealthToWidth(var float h) -> int do
+		var float percent = (h/BAR_MAX_HEALTH) as float;
+		var int r = (BAR_FULL_WIDTH * percent) as int;
+		escape r;
+	end
+	
+	loop do
+		h = await health;
+		_printf("------------%d\n",h);
+		if(h < 40) then
+			r = 0xFF;
+			g = 0x00;
+			r2 = 0x44;
+			g2 = 0x00;
+		else/if (h < 70) then
+			r = 0xFF;
+			g = 0xFF;
+			r2 = 0x44;
+			g2 = 0x44;
+		else
+			r = 0x00;
+			g = 0xFF;
+			r2 = 0x00;
+			g2 = 0x44;
+		end
+		var int temp = call HealthToWidth(h as float);
+		bar.w = temp;
+		
+	end
+
+end

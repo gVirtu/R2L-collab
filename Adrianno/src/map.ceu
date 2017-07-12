@@ -1,6 +1,0 @@
-
-loop i in [0 -> 10] do
-	spawn ObstacleBlock(i,0, &tx_ROOF_EDGE, BL_EDGE_DOWN) in roof;
-end
-
-	

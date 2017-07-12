@@ -1,0 +1,40 @@
+code/await BGHelper(void) -> FOREVER do
+    every SDL_REDRAW do
+        var int i;
+        var int j;
+        //Aesthetics
+        var int min_i = (outer.camera.y/BLOCK_SIZE);
+        var int max_i = _clamp(min_i + (outer.camera.h/BLOCK_SIZE) + 2, 0, _world_h);
+        var int min_j = (outer.camera.x/BLOCK_SIZE);
+        var int max_j = _clamp(min_j + (outer.camera.w/BLOCK_SIZE) + 2, 0, _world_w);
+        loop i in [min_i -> max_i[ do
+            loop j in [min_j -> max_j[ do
+                var int currentTile;
+                currentTile = _world[j + (i * _world_w)];
+                if (currentTile > 0 and currentTile < 100) then
+                    var int angle = 0;
+                    var SDL_Texture imgtex = outer.tx_ASPHALT.tex;
+                    
+                    //Aesthetics
+                    if (currentTile >= 20) then
+                        angle = 90*(currentTile-20);
+                        imgtex = outer.tx_SIDEWALK_EDGE.tex;
+                    else/if (currentTile >= 10) then
+                        angle = 90*(currentTile-10);
+                        imgtex = outer.tx_SIDEWALK_CORNER.tex;
+                    end
+
+                    var SDL_Rect tmp = val SDL_Rect(j * BLOCK_SIZE - outer.camera.x,
+                                                i * BLOCK_SIZE - outer.camera.y,
+                                                BLOCK_SIZE, BLOCK_SIZE);
+                                            
+                    _SDL_RenderCopyEx(  &&outer.sdl!.ren, 
+                                        &&imgtex.tex, 
+                                        null, &&tmp as _SDL_Rect&&, 
+                                        angle, null, _SDL_FLIP_NONE);
+                end
+                // { printf("%d ", world[@j + (@i * WORLD_W)]); }
+            end
+        end
+    end
+end

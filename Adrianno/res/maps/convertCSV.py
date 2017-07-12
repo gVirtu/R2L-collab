@@ -1,8 +1,8 @@
 import fileinput
 
-f = open('converted.map', 'w');
-f.write("2\n");
-f.write("5\n");
+f = open('final_small.map', 'w');
+f.write("11\n");
+f.write("15\n");
 for line in fileinput.input():
     tiles = line.replace('\r\n','').split(',');
 
@@ -50,7 +50,8 @@ for line in fileinput.input():
             '30':'j',
             '31':'i',
             '33':'q',
-            '39':'r'};
+            '39':'r',
+            '40':'@'};
     
     for tile in tiles:
         ret = ret + conv[tile];

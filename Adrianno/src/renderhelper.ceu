@@ -1,0 +1,96 @@
+code/await RenderHelper(void) -> FOREVER do
+    loop do
+        await SDL_REDRAW;
+
+        //Roof
+        /*var&? ObstacleBlock ob;
+        loop ob in outer.roof do 
+            var SDL_Rect tmp = val SDL_Rect(ob!.surface.x - outer.camera.x,
+                                            ob!.surface.y - outer.camera.y,
+                                            BLOCK_SIZE, BLOCK_SIZE);
+                                            
+            _SDL_RenderCopyEx(  &&outer.sdl!.ren, 
+                                &&ob!.imgtex.tex, 
+                                null, &&tmp as _SDL_Rect&&, 
+                                ob!.angle, null, _SDL_FLIP_NONE);
+        end*/
+
+        var int i;
+        var int j;
+        var int min_i = (outer.camera.y/BLOCK_SIZE);
+        var int max_i = _clamp(min_i + (outer.camera.h/BLOCK_SIZE) + 2, 0, _world_h);
+        var int min_j = (outer.camera.x/BLOCK_SIZE);
+        var int max_j = _clamp(min_j + (outer.camera.w/BLOCK_SIZE) + 2, 0, _world_w);
+        loop i in [min_i -> max_i[ do
+            loop j in [min_j -> max_j[ do
+                var int currentTile;
+                currentTile = _world[j + (i * _world_w)];
+                if (currentTile >= 100) then
+                    var int angle = 0;
+                    var SDL_Texture imgtex = outer.tx_CRATES.tex;
+
+                    //Aesthetics
+                    if (currentTile >= 120) then
+                        angle = 90*(currentTile-120);
+                        imgtex = outer.tx_ROOF_EDGE.tex;
+                    else/if (currentTile >= 110) then
+                        angle = 90*(currentTile-110);
+                        imgtex = outer.tx_ROOF_CORNER.tex;
+                    end
+
+                    var SDL_Rect tmp = val SDL_Rect(j * BLOCK_SIZE - outer.camera.x,
+                                                i * BLOCK_SIZE - outer.camera.y,
+                                                BLOCK_SIZE, BLOCK_SIZE);
+                                            
+                    _SDL_RenderCopyEx(  &&outer.sdl!.ren, 
+                                        &&imgtex.tex, 
+                                        null, &&tmp as _SDL_Rect&&, 
+                                        angle, null, _SDL_FLIP_NONE);
+                end
+                // { printf("%d ", world[@j + (@i * WORLD_W)]); }
+            end
+        end
+
+        //Crosshair
+        _SDL_RenderCopy(&&outer.sdl!.ren, &&outer.tx_crosshair.tex.tex, null, &&outer.crosshair!.ch as _SDL_Rect&&);
+                                
+        //_SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0x00,0xFF,0x00,0xFF);
+        //_SDL_RenderFillRect(&&outer.sdl!.ren, (&&tmp as _SDL_Rect&&));
+        
+        //Healthbar
+        var SDL_Rect shadowbar = outer.healthHud!.bar;
+        shadowbar.x = shadowbar.x+6;
+        shadowbar.y = shadowbar.y+6;
+        _SDL_SetRenderDrawColor(&&outer.sdl!.ren, outer.healthHud!.r2, outer.healthHud!.g2,0x00,0xFF);
+        _SDL_RenderFillRect(&&outer.sdl!.ren, (&&shadowbar as _SDL_Rect&&));
+
+        _SDL_SetRenderDrawColor(&&outer.sdl!.ren, outer.healthHud!.r, outer.healthHud!.g,0x00,0xFF);
+        _SDL_RenderFillRect(&&outer.sdl!.ren, (&&outer.healthHud!.bar as _SDL_Rect&&));
+
+        _SDL_SetRenderDrawColor(&&outer.sdl!.ren, outer.healthHud!.r2,outer.healthHud!.g2,0x00,0xFF);
+        _SDL_RenderFillRect(&&outer.sdl!.ren, (&&outer.healthHud!.b3 as _SDL_Rect&&));
+        
+        _SDL_SetRenderDrawColor(&&outer.sdl!.ren, outer.healthHud!.r2,outer.healthHud!.g2,0x00,0xFF);
+        _SDL_RenderFillRect(&&outer.sdl!.ren, (&&outer.healthHud!.b4 as _SDL_Rect&&));
+
+        _SDL_SetRenderDrawColor(&&outer.sdl!.ren, outer.healthHud!.r,outer.healthHud!.g,0x00,0xFF);
+        _SDL_RenderFillRect(&&outer.sdl!.ren, (&&outer.healthHud!.b1 as _SDL_Rect&&));
+        
+        _SDL_SetRenderDrawColor(&&outer.sdl!.ren, outer.healthHud!.r,outer.healthHud!.g,0x00,0xFF);
+        _SDL_RenderFillRect(&&outer.sdl!.ren, (&&outer.healthHud!.b2 as _SDL_Rect&&));
+
+        //Kill count
+        vector[10] byte scorestr; _sprintf(&&scorestr[0], "%lu", outer.kills);
+        var& SDL_New_Text txt =
+        spawn SDL_New_Text(&outer.sdl!.ren, &outer.font.font, &&scorestr[0], SDL_Color(0xEE,0x00,0x00,0xFF));
+        var& SDL_New_Text txt2 =
+        spawn SDL_New_Text(&outer.sdl!.ren, &outer.font.font, &&scorestr[0], SDL_Color(0x33,0x00,0x00,0xFF));
+        var SDL_Rect rect = val SDL_Rect(SCREEN_WIDTH - txt.tex.width - 35, 20, txt.tex.width, txt.tex.height);
+        var SDL_Rect rect2 = rect;
+        rect2.x = rect.x+6;
+        rect2.y = rect.y+6;
+
+        _SDL_RenderCopy(&&outer.sdl!.ren, &&txt2.tex.tex, null, &&rect2 as _SDL_Rect&&);
+        _SDL_RenderCopy(&&outer.sdl!.ren, &&txt.tex.tex, null, &&rect as _SDL_Rect&&);
+    end
+end

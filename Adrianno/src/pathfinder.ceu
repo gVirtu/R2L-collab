@@ -10,31 +10,36 @@ code/await Pathfinder (var int fromX, var int fromY, var int toX, var int toY)
         loop do
             await async/thread(path, fromX, fromY, toX, toY) do 
                 //Process path
+                if (_world[toX + toY*_world_w] < 100) then 
+                    var PathNode pathFrom;
+                    pathFrom = val PathNode(fromX, fromY); // as _PathNode;
+                    var PathNode pathTo;
+                    pathTo = val PathNode(toX, toY); // as _PathNode;
 
-                var PathNode pathFrom;
-                pathFrom = val PathNode(fromX, fromY); // as _PathNode;
-                var PathNode pathTo;
-                pathTo = val PathNode(toX, toY); // as _PathNode;
+                    var _ASPath aspath;
+                    _printf("Path finding call!\n");
+                    aspath = _ASPathCreate({&PathNodeSource}, {NULL}, &&pathFrom as _PathNode&&, &&pathTo as _PathNode&&);
 
-                var _ASPath aspath;
-                aspath = _ASPathCreate({&PathNodeSource}, {NULL}, &&pathFrom as _PathNode&&, &&pathTo as _PathNode&&);
-                var usize path_size;
-                path_size = _ASPathGetCount(aspath);
-                
-                if (path_size > 0) then
-                    atomic do 
-                        path = [];
-                        var usize i;
-                        loop i in [0 -> path_size[ do
-                            var _PathNode&& pathNode;
-                            pathNode = _ASPathGetNode(aspath, i);
-                            var PathNode newNode;
-                            newNode = val PathNode(pathNode:x, pathNode:y); //regular typecast gets assertion errors
-                            //_printf("I am at node (%d, %d)\n", pathNode:x, pathNode:y);
-                            path = path .. [newNode];
-                        end
+                    var usize path_size;
+                    path_size = _ASPathGetCount(aspath);
+                    
+                    if (path_size > 0) then
+                        atomic do 
+                            path = [];
+                            var usize i;
+                            loop i in [0 -> path_size[ do
+                                var _PathNode&& pathNode;
+                                pathNode = _ASPathGetNode(aspath, i);
+                                var PathNode newNode;
+                                newNode = val PathNode(pathNode:x, pathNode:y); //regular typecast gets assertion errors
+                                //_printf("I am at node (%d, %d)\n", pathNode:x, pathNode:y);
+                                path = path .. [newNode];
+                            end
+                        end 
                     end 
-                end 
+                else 
+                    _printf("Path finding: Unreachable!\n");
+                end
             end
             (fromX, fromY, toX, toY) = await do_retarget;
         end
