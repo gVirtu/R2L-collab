@@ -109,6 +109,9 @@ code/await Player(var float x0, var float y0)->
 	var int spd = 20;
 	var bool mouse = true;
 	var int dt = 0;
+
+	var int gridx = (x+(radius as int))/BLOCK_SIZE;
+    var int gridy = (y+(radius as int))/BLOCK_SIZE;
 	
 	playerOrigin_x = 0;
 	playerOrigin_y = 0;
@@ -222,6 +225,7 @@ code/await Player(var float x0, var float y0)->
 	
 	par/or do
 		every dt in SDL_DT do
+			var bool updateChasers = false;
 		
 			var bool go_x = true;
 			var bool go_y = true;
@@ -263,12 +267,26 @@ code/await Player(var float x0, var float y0)->
 			if go_x then
 				x = xf;
 				xc = xcf;
+
+				if ((x+(radius as int))/BLOCK_SIZE != gridx) then
+					gridx = (x+(radius as int))/BLOCK_SIZE;
+					updateChasers = true;
+				end
 			end
 			
 			if go_y then
 				y = yf; 
 				yc = ycf;
+
+				if ((y+(radius as int))/BLOCK_SIZE != gridy) then
+					gridy = (y+(radius as int))/BLOCK_SIZE;
+					updateChasers = true;
+				end
 			end
+			
+			if (updateChasers) then
+                emit outer.retracePaths;
+            end
 			
 			call UpdateOrigin();
 			

@@ -150,33 +150,33 @@ void PathNodeNeighbors(ASNeighborList neighbors, void *node, void *context) {
     char free_left = 0; char free_up = 0;
     char free_right = 0; char free_down = 0;
 
-    if (WorldAt(pathNode->x+1, pathNode->y) == 0) {
+    if (WorldAt(pathNode->x+1, pathNode->y) < 100) {
         free_right = 1;
         ASNeighborListAdd(neighbors, &(PathNode){pathNode->x+1, pathNode->y}, 1);
     }
-    if (WorldAt(pathNode->x-1, pathNode->y) == 0) {
+    if (WorldAt(pathNode->x-1, pathNode->y) < 100) {
         free_left = 1;
         ASNeighborListAdd(neighbors, &(PathNode){pathNode->x-1, pathNode->y}, 1);
     }
-    if (WorldAt(pathNode->x, pathNode->y+1) == 0) {
+    if (WorldAt(pathNode->x, pathNode->y+1) < 100) {
         free_down = 1;
         ASNeighborListAdd(neighbors, &(PathNode){pathNode->x, pathNode->y+1}, 1);
     }
-    if (WorldAt(pathNode->x, pathNode->y-1) == 0) {
+    if (WorldAt(pathNode->x, pathNode->y-1) < 100) {
         free_up = 1;
         ASNeighborListAdd(neighbors, &(PathNode){pathNode->x, pathNode->y-1}, 1);
     }
 
-    if (free_right && free_down && WorldAt(pathNode->x+1, pathNode->y+1) == 0) {
+    if (free_right && free_down && WorldAt(pathNode->x+1, pathNode->y+1) < 100) {
         ASNeighborListAdd(neighbors, &(PathNode){pathNode->x+1, pathNode->y+1}, 1);
     }
-    if (free_left && free_up && WorldAt(pathNode->x-1, pathNode->y-1) == 0) {
+    if (free_left && free_up && WorldAt(pathNode->x-1, pathNode->y-1) < 100) {
         ASNeighborListAdd(neighbors, &(PathNode){pathNode->x-1, pathNode->y-1}, 1);
     }
-    if (free_left && free_down && WorldAt(pathNode->x-1, pathNode->y+1) == 0) {
+    if (free_left && free_down && WorldAt(pathNode->x-1, pathNode->y+1) < 100) {
         ASNeighborListAdd(neighbors, &(PathNode){pathNode->x-1, pathNode->y+1}, 1);
     }
-    if (free_right && free_up && WorldAt(pathNode->x+1, pathNode->y-1) == 0) {
+    if (free_right && free_up && WorldAt(pathNode->x+1, pathNode->y-1) < 100) {
         ASNeighborListAdd(neighbors, &(PathNode){pathNode->x+1, pathNode->y-1}, 1);
     }
 }

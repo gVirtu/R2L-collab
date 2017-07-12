@@ -18,6 +18,7 @@ native _ASPath, _PathNode;
 
 native/pre do
 	##include<math.h>
+	##include<time.h>
 end
 
 native _acos, _atan2;// _sin, _cos;
@@ -48,7 +49,9 @@ _SDL_ShowCursor(_SDL_DISABLE);
 
 
 watching sdl do
-	_loadWorld("./res/maps/converted.map");
+	{srand(time(NULL));}
+
+	_loadWorld("./res/maps/converted_100.map");
 
 	native/const
         _world, _world_w, _world_h, 
@@ -120,6 +123,7 @@ watching sdl do
 	//EVENTS
 	event void zombieTouchPlayer;
 	event void playerDied;
+	event void retracePaths;
 	
 	//SOUNDTRACK
 	_Mix_ReserveChannels(1);
@@ -151,7 +155,7 @@ watching sdl do
 
 		loop i in [0 -> _zombies_count[ do
 			spawn Zombie(_zombies_x[i] * BLOCK_SIZE + (BLOCK_SIZE>>1), 
-						 _zombies_y[i] * BLOCK_SIZE + (BLOCK_SIZE>>1), 3) in zombies;
+						 _zombies_y[i] * BLOCK_SIZE + (BLOCK_SIZE>>1), 100) in zombies;
 		end
 
 		/*
@@ -214,7 +218,7 @@ watching sdl do
 				loop shot in shots do
 					var&? Zombie z;
 					loop z in zombies do
-						if (shot? and z? and call Intersects(&shot!.obj, &z!.collider)) then
+						if (shot? and z? and call Intersects(&shot!.obj, &z!.collision)) then
 							emit shot!.die;
 							emit z!.die;
 							emit p.zombieDeath;
@@ -224,7 +228,15 @@ watching sdl do
 				end
 				
 			end
-
+		with
+			loop do
+				await retracePaths;
+				var&? Zombie chaserA;
+				loop chaserA in zombies do
+					emit chaserA!.update_pf((p.playerOrigin_x as int)/BLOCK_SIZE, (p.playerOrigin_y as int)/BLOCK_SIZE);
+					await 50ms;
+				end
+			end 
 		with
 			loop do
 				await zombieTouchPlayer;
