@@ -19,7 +19,7 @@ pool[] ChaserRef cRefs;
 var& SDL_Open_Image tx_zombie = spawn SDL_Open_Image( &sdl!.ren, "res/spritesheet_zombie.png");
 
 code/await Zombie(var int x, var int y, var int speed) -> 
-				(var u64 chID = 0, var SDL_Rect collision, event (int, int) update_pf, event void die) -> void do
+				(var u64 chID = 0, var int hitPoints, var SDL_Rect collision, event (int, int) update_pf, event void die) -> void do
 
 	collision = val SDL_Rect(x, y, ZOMBIE_SIZE, ZOMBIE_SIZE);
 	var int target_x = outer.p.playerOrigin_x as int;
@@ -44,6 +44,14 @@ code/await Zombie(var int x, var int y, var int speed) ->
 
 	var bool debugMe = false;
 
+	event bool ev_reverseX;
+	event bool ev_reverseY;
+
+	var bool reverseX = false;
+	var bool reverseY = false;
+
+	hitPoints = 2;
+
 	var int animationFrame = 0;
 	
 	code/tight NextFrame(var int f, var int max) -> int do
@@ -66,7 +74,7 @@ code/await Zombie(var int x, var int y, var int speed) ->
 	var bool lineOfSight = false;
 	
 	par/or do
-		loop do
+	/*	loop do  //Only for debug purposes
 			var _SDL_MouseButtonEvent&& mb;
 			mb = await SDL_MOUSEBUTTONDOWN until mb:button == _SDL_BUTTON_RIGHT;
 			var int mx = mb:x + outer.camera.x;
@@ -77,6 +85,22 @@ code/await Zombie(var int x, var int y, var int speed) ->
 			end
 		end 
 		await FOREVER;
+	with*/
+		loop do
+			await ev_reverseX;
+			reverseX = true;
+			await (300+(_rand()%1200))ms;
+			reverseX = false;
+			emit ev_reverseX(false);
+		end 
+	with
+		loop do
+			await ev_reverseY;
+			reverseY = true;
+			await (300+(_rand()%1200))ms;
+			reverseY = false;
+			emit ev_reverseY(false);
+		end 
 	with
 		var int dt = 0;
 		every dt in SDL_DT do
@@ -197,13 +221,17 @@ code/await Zombie(var int x, var int y, var int speed) ->
                     collision_shifted.x = x - ZOMBIE_SIZE/2;
                     if (call Intersects(&cr!.collision, &collision_shifted)) then 
                         //canMoveX = false;
-						x = x - 2*xmoved;
-						xmoved = -xmoved;
+						emit ev_reverseX(true);
                         break;
                     end
                 end 
             end
             #endif
+
+			if (reverseX) then
+				x = x - 2*xmoved;
+				xmoved = -xmoved;
+			end
 
             var int nextLX = (x-(ZOMBIE_SIZE>>1)-1)/BLOCK_SIZE;
             var int nextRX = (x+(ZOMBIE_SIZE>>1)+1)/BLOCK_SIZE;
@@ -214,10 +242,10 @@ code/await Zombie(var int x, var int y, var int speed) ->
 			if (xmoved<0 and 
 				(_world[nextLX + gridTY*_world_w] >= 100 or
 				_world[nextLX + gridBY*_world_w] >= 100)) then
-				if (debugMe) then 
-					_printf("Cannot move X because of left edge. LX=%d, TY=%d, BY=%d, WT=%d, WB=%d\n", 
-							nextLX, gridTY, gridBY, _world[nextLX + gridTY*_world_w], _world[nextLX + gridBY*_world_w]);
-				end
+				//if (debugMe) then 
+				//	_printf("Cannot move X because of left edge. LX=%d, TY=%d, BY=%d, WT=%d, WB=%d\n", 
+				//			nextLX, gridTY, gridBY, _world[nextLX + gridTY*_world_w], _world[nextLX + gridBY*_world_w]);
+				//end
 				canMoveX = false;
 			end
 
@@ -225,10 +253,10 @@ code/await Zombie(var int x, var int y, var int speed) ->
 			if (xmoved>0 and 
 				(_world[nextRX + gridTY*_world_w] >= 100 or
 				 _world[nextRX + gridBY*_world_w] >= 100)) then
-				 if (debugMe) then 
-					_printf("Cannot move X because of right edge. RX=%d, TY=%d, BY=%d, WT=%d, WB=%d\n", 
-							nextRX, gridTY, gridBY, _world[nextRX + gridTY*_world_w], _world[nextRX + gridBY*_world_w]);
-				end
+				 //if (debugMe) then 
+				//	_printf("Cannot move X because of right edge. RX=%d, TY=%d, BY=%d, WT=%d, WB=%d\n", 
+				//			nextRX, gridTY, gridBY, _world[nextRX + gridTY*_world_w], _world[nextRX + gridBY*_world_w]);
+				//end
 				canMoveX = false;
 			end
 
@@ -239,13 +267,17 @@ code/await Zombie(var int x, var int y, var int speed) ->
                     collision_shifted.y = y - ZOMBIE_SIZE/2;
                     if (call Intersects(&cr!.collision, &collision_shifted)) then 
                         //canMoveY = false;
-						y = y - 2*ymoved;
-						ymoved = -ymoved;
+						emit ev_reverseY(true);
                         break;
                     end
                 end
             end
             #endif
+
+			if (reverseY) then
+				y = y - 2*ymoved;
+				ymoved = -ymoved;
+			end
 
             var int nextUY = (y-(ZOMBIE_SIZE>>1)-1)/BLOCK_SIZE;
             var int nextDY = (y+(ZOMBIE_SIZE>>1)+1)/BLOCK_SIZE;
@@ -256,10 +288,10 @@ code/await Zombie(var int x, var int y, var int speed) ->
 			if (ymoved<0 and 
 				(_world[gridLX + nextUY*_world_w] >= 100 or
 				 _world[gridRX + nextUY*_world_w] >= 100)) then
-				 if (debugMe) then 
-					_printf("Cannot move Y because of upper edge. UY=%d, LX=%d, RX=%d, WL=%d, WR=%d\n", 
-							nextUY, gridLX, gridRX, _world[gridLX + nextUY*_world_w], _world[gridRX + nextUY*_world_w]);
-				end
+				 //if (debugMe) then 
+				//	_printf("Cannot move Y because of upper edge. UY=%d, LX=%d, RX=%d, WL=%d, WR=%d\n", 
+				//			nextUY, gridLX, gridRX, _world[gridLX + nextUY*_world_w], _world[gridRX + nextUY*_world_w]);
+				//end
 				canMoveY = false;
 			end
 
@@ -267,10 +299,10 @@ code/await Zombie(var int x, var int y, var int speed) ->
 			if (ymoved>0 and
 				(_world[gridLX + nextDY*_world_w] >= 100 or
 				 _world[gridRX + nextDY*_world_w] >= 100)) then
-				 if (debugMe) then 
-					_printf("Cannot move Y because of bottom edge. DY=%d, LX=%d, RX=%d, WL=%d, WR=%d\n", 
-							nextDY, gridLX, gridRX, _world[gridLX + nextDY*_world_w], _world[gridRX + nextDY*_world_w]);
-				end
+				 //if (debugMe) then 
+				//	_printf("Cannot move Y because of bottom edge. DY=%d, LX=%d, RX=%d, WL=%d, WR=%d\n", 
+				//			nextDY, gridLX, gridRX, _world[gridLX + nextDY*_world_w], _world[gridRX + nextDY*_world_w]);
+				//end
 				canMoveY = false;
 			end
 
@@ -418,19 +450,19 @@ code/await Zombie(var int x, var int y, var int speed) ->
 											collision.y - outer.camera.y,
 											ZOMBIE_SIZE, ZOMBIE_SIZE);
 				
-			if (debugMe) then 
-				_SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0x00,0x00,0xFF,0xFF);
-			else/if ($pf!.path == 0) then
-				_SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0xFF,0x00,0x00,0xFF);
-			else
+			//if (debugMe) then 
+			//	_SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0x00,0x00,0xFF,0xFF);
+			//else/if ($pf!.path == 0) then
+			//	_SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0xFF,0x00,0x00,0xFF);
+			//else
 				_SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0x00,0xFF,0x00,0xFF);
-			end
+			//end
 			_SDL_RenderFillRect(&&outer.sdl!.ren, (&&tmp as _SDL_Rect&&));
-			_SDL_RenderDrawLine(&&outer.sdl!.ren, 
+			/*_SDL_RenderDrawLine(&&outer.sdl!.ren, 
                                         x - outer.camera.x, 
                                         y - outer.camera.y,
                                         target_x - outer.camera.x, 
-                                        target_y - outer.camera.y);
+                                        target_y - outer.camera.y);*/
 		end	
 	with
 		await die;

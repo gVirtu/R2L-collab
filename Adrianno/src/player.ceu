@@ -293,8 +293,8 @@ code/await Player(var float x0, var float y0)->
 			render.x = fg.x - outer.camera.x;
 			render.y = fg.y - outer.camera.y;
 			
-			var Vec2d vec = call Vec_GetDirection(  (playerOrigin_x) as int, 
-													(playerOrigin_y) as int, 
+			var Vec2d vec = call Vec_GetDirection(  ((playerOrigin_x) as int) - outer.camera.x, 
+													((playerOrigin_y) as int) - outer.camera.y, 
 													target_x, 
 													target_y);
 			var Vec2d yaxis = call Vec_GetDirection( 0, 0, 0, -1);
@@ -424,8 +424,8 @@ code/await Player(var float x0, var float y0)->
 													  mb:y + outer.camera.y);
 
 				var int i;
-				loop i in [0 -> 4[ do
-					var int rot_angle = (i-2)*4;
+				loop i in [0 -> 6[ do
+					var int rot_angle = (i-3)*4;
 
 					var float cos = _cos(call DegreeToRad(rot_angle as float));
 					var float sin = _sin(call DegreeToRad(rot_angle as float));
@@ -453,8 +453,8 @@ code/await Player(var float x0, var float y0)->
 	with // MOUSE MOVEMENT	
 		var _SDL_MouseMotionEvent&& mse;
 		every mse in SDL_MOUSEMOTION do
-			target_x = mse:x + outer.camera.x;
-			target_y = mse:y + outer.camera.y;
+			target_x = mse:x;
+			target_y = mse:y;
 		end
 	with 
         every 80ms do

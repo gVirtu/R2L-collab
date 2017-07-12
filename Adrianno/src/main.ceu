@@ -155,7 +155,7 @@ watching sdl do
 
 		loop i in [0 -> _zombies_count[ do
 			spawn Zombie(_zombies_x[i] * BLOCK_SIZE + (BLOCK_SIZE>>1), 
-						 _zombies_y[i] * BLOCK_SIZE + (BLOCK_SIZE>>1), 100) in zombies;
+						 _zombies_y[i] * BLOCK_SIZE + (BLOCK_SIZE>>1), 40 + (_rand()%100)) in zombies;
 		end
 
 		/*
@@ -219,9 +219,12 @@ watching sdl do
 					var&? Zombie z;
 					loop z in zombies do
 						if (shot? and z? and call Intersects(&shot!.obj, &z!.collision)) then
+							z!.hitPoints = z!.hitPoints - 1;
+							if (z!.hitPoints < 1) then 
+								emit z!.die;
+								emit p.zombieDeath;
+							end 
 							emit shot!.die;
-							emit z!.die;
-							emit p.zombieDeath;
 						end
 					end	
 					
@@ -233,7 +236,8 @@ watching sdl do
 				await retracePaths;
 				var&? Zombie chaserA;
 				loop chaserA in zombies do
-					emit chaserA!.update_pf((p.playerOrigin_x as int)/BLOCK_SIZE, (p.playerOrigin_y as int)/BLOCK_SIZE);
+					emit chaserA!.update_pf(_clamp(-1+(_rand()%3) +(p.playerOrigin_x as int)/BLOCK_SIZE,0,_world_w-1), 
+											_clamp(-1+(_rand()%3) +(p.playerOrigin_y as int)/BLOCK_SIZE,0,_world_h-1));
 					await 50ms;
 				end
 			end 

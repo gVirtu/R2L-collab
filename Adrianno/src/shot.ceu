@@ -66,6 +66,8 @@ code/await Shot(var int x0, var int y0, var Vec2d direction,
 								&&render as _SDL_Rect&&, 
 								angle, null, _SDL_FLIP_NONE);
 		end
+	with
+		await 1s;
 	with 
 		await die;
 	end
