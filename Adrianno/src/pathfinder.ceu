@@ -3,7 +3,7 @@ data PathNode with
     var int y;
 end
 
-#define MAX_THREADS 4
+#define MAX_THREADS 40000
 
 code/await Pathfinder (var int fromX, var int fromY, var int toX, var int toY) 
     -> (vector[] PathNode path = [], event (int, int, int, int) do_retarget, event void destroy, var bool pending) 
@@ -16,7 +16,7 @@ code/await Pathfinder (var int fromX, var int fromY, var int toX, var int toY)
             loop do
                 if (outer.threadcount<MAX_THREADS) then
                     outer.threadcount = outer.threadcount + 1;
-                    await async/thread(path, fromX, fromY, toX, toY) do 
+                    //await async/thread(path, fromX, fromY, toX, toY) do 
                         //Process path
                         if (_world[toX + toY*_world_w] < 100) then 
                             var PathNode pathFrom;
@@ -50,7 +50,7 @@ code/await Pathfinder (var int fromX, var int fromY, var int toX, var int toY)
                         //else 
                         //    _PRINTNOTHING("Path finding: Unreachable!\n");
                         end
-                    end
+                    //end
                     outer.threadcount = outer.threadcount - 1;
                     break;
                 end

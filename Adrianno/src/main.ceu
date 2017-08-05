@@ -9,7 +9,7 @@
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
 
-#define NUM_ZOMBIES 4000
+#define NUM_ZOMBIES 10
 
 #define PI 3.1415926535897932
 
@@ -23,6 +23,22 @@ native _ASPath, _PathNode;
 native/pre do
 	##include<math.h>
 	##include<time.h>
+	
+	long long int timestamp_ms(void) {
+		long            ms; // Milliseconds
+		time_t          s;  // Seconds
+		long long int   ts; //timestamp
+		struct timespec spec;
+
+		clock_gettime(CLOCK_REALTIME, &spec);
+
+		s  = spec.tv_sec;
+		ms = round(spec.tv_nsec / 1.0e6); // Convert nanoseconds to milliseconds
+
+		ts = (((long long int) s)*1000) + ms;
+
+		return ts;
+	}
 end
 
 native _acos, _atan2;// _sin, _cos;
@@ -61,7 +77,9 @@ _SDL_ShowCursor(_SDL_DISABLE);
 watching sdl do
 	{srand(time(NULL));}
 
-	_loadWorld("./res/maps/final.map");
+	_printf("Loading...");
+	_loadWorld("./res/maps/bigmaze.map");
+	_printf("Done.");
 
 	native/const
         _world, _world_w, _world_h, 
@@ -85,7 +103,7 @@ watching sdl do
 	var int i;
     var int j;
     var int w=1;
-    _PRINTNOTHING("%d x %d with %d\n", _world_w, _world_h, _zombies_count);
+    _printf("%d x %d with %d\n", _world_w, _world_h, _zombies_count);
 
 	chaserID = 0;
 	//WORLD GENERATION
@@ -231,11 +249,13 @@ watching sdl do
 		spawn RenderHelper();
 		
 		//pool[] Render l1;
+
+		var s64 time_before = {timestamp_ms()};
 		
 		//#include "map.ceu"
 		par/or do
 			var int t;	
-			loop t in [0 -> 600] do
+			loop t in [0 -> 300] do
 				await SDL_DT;
 				//emit p.zombieTouch;
 				//_PRINTNOTHING(" CAM %d, %d\n", p.playerOrigin_x as int, p.playerOrigin_y as int);
@@ -302,6 +322,8 @@ watching sdl do
 		
 		//var _SDL_MouseButtonEvent&& mb;
 		//mb = await SDL_MOUSEBUTTONDOWN until mb:button == _SDL_BUTTON_LEFT;
+		var s64 time_after = {timestamp_ms()};
+		_printf("Elapsed time: %ld ms.", time_after - time_before);
 		break;
 	end
 	

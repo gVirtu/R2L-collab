@@ -1,6 +1,6 @@
-#define WORLD_MAX_W 100
-#define WORLD_MAX_H 100
-#define MAX_SPAWNERS 100
+#define WORLD_MAX_W 1500
+#define WORLD_MAX_H 1500
+#define MAX_SPAWNERS 1000000
 
 int world[WORLD_MAX_W * WORLD_MAX_H];
 int zombies_x[MAX_SPAWNERS];
