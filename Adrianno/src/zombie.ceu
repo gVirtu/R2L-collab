@@ -8,8 +8,8 @@
 
 #define TRACE_DELAY 100
 #define COLLISION_DELAY 500
-#define APPEND_LIMIT 8
-#define CHASER_NO_OVERLAP 1
+#define APPEND_LIMIT 0
+//#define CHASER_NO_OVERLAP 1
 #define CHASER_MAX_SQDIST 6000000
 
 var& SDL_Open_Sound snd_ZB_1 = spawn SDL_Open_Sound("res/snds/zumbi_1.wav");
@@ -38,7 +38,7 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
     chID = outer.chaserID;
     ref!.chID = chID;
     outer.chaserID = outer.chaserID + 1;
-	//_printf("We have %lu chasers.\n", outer.chaserID);
+	//_PRINTNOTHING("We have %lu chasers.\n", outer.chaserID);
 
 	var int pathstep = 1;
     var int appended = 0;
@@ -99,7 +99,7 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 			(outer.y - outer.camera.y < SCREEN_HEIGHT)) then
 
 			if(tmp == 1) then
-				_printf("ZOMBIRRRL\n");
+				//_PRINTNOTHING("ZOMBIRRRL\n");
 				var int voice = (_rand()%3);
 				if(voice == 0) then
 					spawn PlayVoice(&outer.snd_ZB_1);
@@ -159,7 +159,6 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 	with
 		var int dt = 0;
 		every dt in SDL_DT do
-			if (call GetSqDistance() < CHASER_MAX_SQDIST) then
 				var int v = speed * dt/1000;
 				//Test line of sight
 				var int losX;
@@ -221,19 +220,19 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 					else
 						y = losY;
 					end 
-					//_printf("LOS ON :))))\n");
+					//_PRINTNOTHING("LOS ON :))))\n");
 					pf!.path = [];
 					/*var int dd = (dx*dx + dy*dy)/100;
 					var int dcos = (dx*dx)/(dd);
 					var int dsin = (dy*dy)/(dd);
 
-					_printf("(X,Y) = (%d,%d); (DX,DY) = (%d,%d); (DCOS, DSIN) = (%d, %d)\n", x, y, dx, dy, dcos, dsin);
+					_PRINTNOTHING("(X,Y) = (%d,%d); (DX,DY) = (%d,%d); (DCOS, DSIN) = (%d, %d)\n", x, y, dx, dy, dcos, dsin);
 					
 					x = x + ((_sign(dx) * dcos * v)/100);
 					y = y + ((_sign(dy) * dsin * v)/100);*/
 				else 
 				//Follow A* path instead
-					//_printf("LOS OFF DDDDDD: (Step: %d of %d)\n", pathstep, $pf!.path);
+					//_PRINTNOTHING("LOS OFF DDDDDD: (Step: %d of %d)\n", pathstep, $pf!.path);
 					if (pathstep < $pf!.path) then
 						target_x = (BLOCK_SIZE>>1) + pf!.path[pathstep].x * BLOCK_SIZE; 
 						target_y = (BLOCK_SIZE>>1) + pf!.path[pathstep].y * BLOCK_SIZE;
@@ -241,7 +240,7 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 						var int dx = (target_x) - x;
 						var int dy = (target_y) - y;
 
-						//_printf("DX=%d and DY=%d and V=%d\n", dx, dy, v);
+						//_PRINTNOTHING("DX=%d and DY=%d and V=%d\n", dx, dy, v);
 						if (_abs(dx) + _abs(dy) < v) then
 							pathstep = pathstep + 1;
 						else 
@@ -260,7 +259,7 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 								y = target_y;
 							end 
 						end
-					else
+					else/if (pf!.pending == false) then
 						//if ($pf!.path == 0) then
 						//Because we aren't in line of sight, this shouldn't be called over and over
 							appended = APPEND_LIMIT;
@@ -299,7 +298,7 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 					(_world[nextLX + gridTY*_world_w] >= 100 or
 					_world[nextLX + gridBY*_world_w] >= 100)) then
 					//if (debugMe) then 
-					//	_printf("Cannot move X because of left edge. LX=%d, TY=%d, BY=%d, WT=%d, WB=%d\n", 
+					//	_PRINTNOTHING("Cannot move X because of left edge. LX=%d, TY=%d, BY=%d, WT=%d, WB=%d\n", 
 					//			nextLX, gridTY, gridBY, _world[nextLX + gridTY*_world_w], _world[nextLX + gridBY*_world_w]);
 					//end
 					canMoveX = false;
@@ -310,7 +309,7 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 					(_world[nextRX + gridTY*_world_w] >= 100 or
 					_world[nextRX + gridBY*_world_w] >= 100)) then
 					//if (debugMe) then 
-					//	_printf("Cannot move X because of right edge. RX=%d, TY=%d, BY=%d, WT=%d, WB=%d\n", 
+					//	_PRINTNOTHING("Cannot move X because of right edge. RX=%d, TY=%d, BY=%d, WT=%d, WB=%d\n", 
 					//			nextRX, gridTY, gridBY, _world[nextRX + gridTY*_world_w], _world[nextRX + gridBY*_world_w]);
 					//end
 					canMoveX = false;
@@ -345,7 +344,7 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 					(_world[gridLX + nextUY*_world_w] >= 100 or
 					_world[gridRX + nextUY*_world_w] >= 100)) then
 					//if (debugMe) then 
-					//	_printf("Cannot move Y because of upper edge. UY=%d, LX=%d, RX=%d, WL=%d, WR=%d\n", 
+					//	_PRINTNOTHING("Cannot move Y because of upper edge. UY=%d, LX=%d, RX=%d, WL=%d, WR=%d\n", 
 					//			nextUY, gridLX, gridRX, _world[gridLX + nextUY*_world_w], _world[gridRX + nextUY*_world_w]);
 					//end
 					canMoveY = false;
@@ -356,7 +355,7 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 					(_world[gridLX + nextDY*_world_w] >= 100 or
 					_world[gridRX + nextDY*_world_w] >= 100)) then
 					//if (debugMe) then 
-					//	_printf("Cannot move Y because of bottom edge. DY=%d, LX=%d, RX=%d, WL=%d, WR=%d\n", 
+					//	_PRINTNOTHING("Cannot move Y because of bottom edge. DY=%d, LX=%d, RX=%d, WL=%d, WR=%d\n", 
 					//			nextDY, gridLX, gridRX, _world[gridLX + nextDY*_world_w], _world[gridRX + nextDY*_world_w]);
 					//end
 					canMoveY = false;
@@ -384,7 +383,6 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 					var Vec2d yaxis = call Vec_GetDirection( 0, 0, 0, -1);
 					angle = call Vec_AngleBetween(yaxis, dir);
 				end
-			end
 		end
 		/*every dt in SDL_DT do
 			
@@ -403,7 +401,7 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 													target_x,
 													target_y);
 													
-			//_printf("direction x = %f   y = %f\n", dir.x, dir.y);
+			//_PRINTNOTHING("direction x = %f   y = %f\n", dir.x, dir.y);
 			dir.x = dir.x * speed;
 			dir.y = dir.y * speed;
 
@@ -448,7 +446,7 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 		
 			
 		end*/
-	with 
+	/*with 
 		every 128ms do
 			lineOfSight = true;
 			var&? CollisionBlock block;
@@ -476,14 +474,13 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
                     lineOfSight = false; break;
                 end
             end
-		end
+		end*/
 	with
 		loop do
             var int gx;
             var int gy;
             (gx, gy) = await update_pf;
-			//_printf("TIME TO UPDATE_PF(%d, %d)\n", gx, gy);
-			if (call GetSqDistance() < CHASER_MAX_SQDIST) then
+			//_PRINTNOTHING("TIME TO UPDATE_PF(%d, %d)\n", gx, gy);
 				if (appended < APPEND_LIMIT) then 
 					appended = appended + 1;
 					var PathNode newNode = val PathNode(gx, gy);
@@ -494,7 +491,6 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 					await (TRACE_DELAY)ms;
 					appended = 0;
 				end
-			end
         end 
 	with
 		loop do
@@ -508,7 +504,6 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 		end
 	with
 		every SDL_REDRAW do
-			if (call GetSqDistance() < CHASER_MAX_SQDIST) then
 				var SDL_Rect clip_rect = call GetFrameRect(animationFrame);
 				
 				var SDL_Rect tmp = val SDL_Rect(collision.x - outer.camera.x,
@@ -522,7 +517,6 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 									&&tmp as _SDL_Rect&&, 
 									angle, null, _SDL_FLIP_NONE);
 				_SDL_SetTextureAlphaMod(&&outer.tx_zombie.tex.tex, alpha);
-			end
 
 			//_SDL_SetRenderDrawColor(&&outer.sdl!.ren, 0x00,0x00,0xFF,0xFF);
 			//_SDL_RenderDrawLine(&&outer.sdl!.ren, 
@@ -554,7 +548,7 @@ code/await Zombie(var int x, var int y, var int speed, var int startHitPoints) -
 	with
 		await die;
 	end
-	//_printf("BYEEEEEE\n");
+	//_PRINTNOTHING("BYEEEEEE\n");
 	//emit outer.p.zombieDeath;
 	emit pf!.destroy;
 	emit ref!.destroy;

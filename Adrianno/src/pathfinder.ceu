@@ -3,44 +3,60 @@ data PathNode with
     var int y;
 end
 
+#define MAX_THREADS 4
+
 code/await Pathfinder (var int fromX, var int fromY, var int toX, var int toY) 
-    -> (vector[] PathNode path = [], event (int, int, int, int) do_retarget, event void destroy) 
+    -> (vector[] PathNode path = [], event (int, int, int, int) do_retarget, event void destroy, var bool pending) 
         -> void do
+    pending = false;
     par/or do
         loop do
-            await async/thread(path, fromX, fromY, toX, toY) do 
-                //Process path
-                if (_world[toX + toY*_world_w] < 100) then 
-                    var PathNode pathFrom;
-                    pathFrom = val PathNode(fromX, fromY); // as _PathNode;
-                    var PathNode pathTo;
-                    pathTo = val PathNode(toX, toY); // as _PathNode;
+            pending = true;
+            var bool broken = false;
+            loop do
+                if (outer.threadcount<MAX_THREADS) then
+                    outer.threadcount = outer.threadcount + 1;
+                    await async/thread(path, fromX, fromY, toX, toY) do 
+                        //Process path
+                        if (_world[toX + toY*_world_w] < 100) then 
+                            var PathNode pathFrom;
+                            pathFrom = val PathNode(fromX, fromY); // as _PathNode;
+                            var PathNode pathTo;
+                            pathTo = val PathNode(toX, toY); // as _PathNode;
 
-                    var _ASPath aspath;
-                    _printf("Path finding call!\n");
-                    aspath = _ASPathCreate({&PathNodeSource}, {NULL}, &&pathFrom as _PathNode&&, &&pathTo as _PathNode&&);
+                            var _ASPath aspath;
+                            //_printf("Path finding call!\n");
+                            aspath = _ASPathCreate({&PathNodeSource}, {NULL}, &&pathFrom as _PathNode&&, &&pathTo as _PathNode&&);
+                            //_printf("Path finding end!\n");
 
-                    var usize path_size;
-                    path_size = _ASPathGetCount(aspath);
-                    
-                    if (path_size > 0) then
-                        atomic do 
-                            path = [];
-                            var usize i;
-                            loop i in [0 -> path_size[ do
-                                var _PathNode&& pathNode;
-                                pathNode = _ASPathGetNode(aspath, i);
-                                var PathNode newNode;
-                                newNode = val PathNode(pathNode:x, pathNode:y); //regular typecast gets assertion errors
-                                //_printf("I am at node (%d, %d)\n", pathNode:x, pathNode:y);
-                                path = path .. [newNode];
-                            end
-                        end 
-                    end 
-                else 
-                    _printf("Path finding: Unreachable!\n");
+                            var usize path_size;
+                            path_size = _ASPathGetCount(aspath);
+                            
+                            if (path_size > 0) then
+                                atomic do 
+                                    path = [];
+                                    var usize i;
+                                    loop i in [0 -> path_size[ do
+                                        var _PathNode&& pathNode;
+                                        pathNode = _ASPathGetNode(aspath, i);
+                                        var PathNode newNode;
+                                        newNode = val PathNode(pathNode:x, pathNode:y); //regular typecast gets assertion errors
+                                        //_PRINTNOTHING("I am at node (%d, %d)\n", pathNode:x, pathNode:y);
+                                        path = path .. [newNode];
+                                    end
+                                end 
+                            end 
+                            //_printf("Path finding end2!\n");
+                        //else 
+                        //    _PRINTNOTHING("Path finding: Unreachable!\n");
+                        end
+                    end
+                    outer.threadcount = outer.threadcount - 1;
+                    break;
                 end
+                await 80ms;
             end
+            pending = false;
             (fromX, fromY, toX, toY) = await do_retarget;
         end
     with

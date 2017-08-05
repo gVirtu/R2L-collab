@@ -3,9 +3,11 @@ var& SDL_Open_Image tx_crosshair = spawn SDL_Open_Image( &sdl!.ren, "res/crossha
 code/await Crosshair(void) -> (var SDL_Rect ch) -> void do
 	
 	ch = val SDL_Rect(0, 0, outer.tx_crosshair.tex.width, outer.tx_crosshair.tex.height);
-	var _SDL_MouseMotionEvent&& mse;
-	every mse in SDL_MOUSEMOTION do
-		ch.x = mse:x - ch.w/2;
-		ch.y = mse:y - ch.h/2;
+	var int dt;
+	every dt in SDL_DT do
+		{int mx=0, my=0; SDL_GetMouseState(&mx, &my);}
+
+		ch.x = {mx} - ch.w/2;
+		ch.y = {my} - ch.h/2;
 	end 
 end

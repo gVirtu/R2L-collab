@@ -131,13 +131,13 @@ code/await Player(var float x0, var float y0)->
  	code/await PlayVoice(var& SDL_Open_Sound snd) -> void do
 	 	var int ret;
 		ret = _Mix_PlayChannel(outer.voiceChannel, &&snd.sound, 0);
-		_printf("-------------------PLAY SOUND RESULT = %d\n",ret);
+		_PRINTNOTHING("-------------------PLAY SOUND RESULT = %d\n",ret);
 	end
 	
 	code/await PlayRandom(void) -> void do
 		var int tmp = _rand()%4;
 		if(tmp == 1) then
-			_printf("BIRRRL\n");
+			//_PRINTNOTHING("BIRRRL\n");
 			if (_Mix_Playing(outer.voiceChannel) == 0) then 
 				var int voice = (_rand()%7);
 				if(voice == 0) then
@@ -161,7 +161,7 @@ code/await Player(var float x0, var float y0)->
 	code/await PlayShot(void) -> void do
 		var int tmp = _rand()%4;
 		if(tmp == 1) then
-			_printf("BIRRRL\n");
+			//_PRINTNOTHING("BIRRRL\n");
 			if (_Mix_Playing(outer.voiceChannel) == 0) then 
 				var int voice = (_rand()%3) - 1;
 				if(voice == 0) then
@@ -177,7 +177,7 @@ code/await Player(var float x0, var float y0)->
 	end
 	
 	code/await PlayPain(void) -> void do
-		_printf("BIRRRL\n");
+		//_PRINTNOTHING("BIRRRL\n");
 		if (_Mix_Playing(outer.voiceChannel) == 1) then
 			_Mix_HaltChannel(outer.voiceChannel);
 		end
@@ -198,7 +198,7 @@ code/await Player(var float x0, var float y0)->
 	code/await PlayKill(void) -> void do
 		var int tmp = _rand()%2;
 		if(tmp == 1) then
-			_printf("BIRRRL\n");
+			//_PRINTNOTHING("BIRRRL\n");
 			if (_Mix_Playing(outer.voiceChannel) == 0) then 
 				var int voice = (_rand()%5) - 1;
 				if(voice == 0) then
@@ -230,9 +230,16 @@ code/await Player(var float x0, var float y0)->
 		
 			var bool go_x = true;
 			var bool go_y = true;
+
+			{const u8 *st = SDL_GetKeyboardState(0);}
+
+			{int mx=0, my=0; SDL_GetMouseState(&mx, &my);}
+
+			target_x = {mx};
+			target_y = {my};
 			
-			vx = ((states[1]as int)*(-spd)) + ((states[3] as int)*spd);
-			vy = ((states[0]as int)*(-spd)) + ((states[2] as int)*spd);
+			vx = (({st[SDL_SCANCODE_A]} as int)*(-spd)) + (({st[SDL_SCANCODE_D]} as int)*spd);
+			vy = (({st[SDL_SCANCODE_W]} as int)*(-spd)) + (({st[SDL_SCANCODE_S]} as int)*spd);
 			
 			var int xf = x + vx*dt/100;
 			var int yf = y + vy*dt/100;
@@ -318,8 +325,8 @@ code/await Player(var float x0, var float y0)->
 		loop do
 			await zombieTouch;
 			playerHealth = playerHealth - 20;
-			_printf("AAAAAAAAAAAAAAAAAAAAAI\n");
-			_printf("Health: %d\n", playerHealth);
+			_PRINTNOTHING("AAAAAAAAAAAAAAAAAAAAAI\n");
+			_PRINTNOTHING("Health: %d\n", playerHealth);
 			emit outer.healthHud!.health(playerHealth);
 			emit pain;
 			if playerHealth <= 0 then
@@ -349,12 +356,12 @@ code/await Player(var float x0, var float y0)->
 					//await 10s;
 				with
 					await shot;
-					_printf("EVENT SHOT\n");
+					_PRINTNOTHING("EVENT SHOT\n");
 					spawn PlayShot();
 					await 1s;
 				with
 					await zombieDeath;
-					_printf("LALALALALA\n");
+					_PRINTNOTHING("LALALALALA\n");
 					spawn PlayKill();
 					//await 7s;
 				end
@@ -368,11 +375,12 @@ code/await Player(var float x0, var float y0)->
 	
 	 /************** KEYBOARD **********************/
 	 //{
+		 /*
 	with // KEYBOARD W
 		loop do
 			var _SDL_KeyboardEvent&& kb;
 			kb = await SDL_KEYDOWN until kb:keysym.sym == _SDLK_w;
-			_printf("W\n");
+			_PRINTNOTHING("W\n");
 			states[0] = true;
 			kb = await SDL_KEYUP until kb:keysym.sym == _SDLK_w;
 			states[0] = false;
@@ -381,7 +389,7 @@ code/await Player(var float x0, var float y0)->
 		loop do
 			var _SDL_KeyboardEvent&& kb;
 			kb = await SDL_KEYDOWN until kb:keysym.sym == _SDLK_a;
-			_printf("A\n");
+			_PRINTNOTHING("A\n");
 			states[1] = true;
 			kb = await SDL_KEYUP until kb:keysym.sym == _SDLK_a;
 			states[1] = false;
@@ -390,7 +398,7 @@ code/await Player(var float x0, var float y0)->
 		loop do
 			var _SDL_KeyboardEvent&& kb;
 			kb = await SDL_KEYDOWN until kb:keysym.sym == _SDLK_s;
-			_printf("S\n");
+			_PRINTNOTHING("S\n");
 			states[2] = true;
 			kb = await SDL_KEYUP until kb:keysym.sym == _SDLK_s;
 			states[2] = false;
@@ -399,12 +407,12 @@ code/await Player(var float x0, var float y0)->
 		loop do
 			var _SDL_KeyboardEvent&& kb;
 			kb = await SDL_KEYDOWN until kb:keysym.sym == _SDLK_d;
-			_printf("D\n");
+			_PRINTNOTHING("D\n");
 			states[3] = true;
 			kb = await SDL_KEYUP until kb:keysym.sym == _SDLK_d;
 			states[3] = false;
 		end
-	 //}
+	 //}*/
 	
 	/************** MOUSE_CLICK ********************/
 	//{
@@ -446,18 +454,18 @@ code/await Player(var float x0, var float y0)->
 				end
 	
 				animationFrame = PL_ANIM_RELOAD_START;
-				_printf("sound\n");
+				_PRINTNOTHING("sound\n");
 				emit shot;
 				await 750ms;
 			end
 		end
 	//}
-	with // MOUSE MOVEMENT	
+	/*with // MOUSE MOVEMENT	
 		var _SDL_MouseMotionEvent&& mse;
 		every mse in SDL_MOUSEMOTION do
 			target_x = mse:x;
 			target_y = mse:y;
-		end
+		end*/
 	with 
         every 80ms do
 			if(animationFrame >= PL_ANIM_RELOAD_START) then
@@ -496,7 +504,7 @@ code/await Player(var float x0, var float y0)->
 	end
 	spawn PlayVoice(&outer.snd_DEATH);
 	emit outer.playerDied;
-	_printf("MORREU\n");
+	_PRINTNOTHING("MORREU\n");
 	var SDL_Rect clip_rect = call GetFrameRect(	39, PL_TILE_SIZE,
 												PL_FRAME_OFFSET_HORIZONTAL,
 												PL_FRAME_OFFSET_VERTICAL,

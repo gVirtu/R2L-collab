@@ -1,5 +1,5 @@
-CEU_DIR     = $(error set absolute path to "<ceu>" repository)
-CEU_SDL_DIR = $(error set absolute path to "<ceu-sdl>" repository)
+CEU_DIR     = /home/gian/ceu
+CEU_SDL_DIR = /home/gian/ceu-sdl
 
 game:
 	    ceu --pre --pre-args="-I$(CEU_DIR)/include -I$(CEU_SDL_DIR)/include" \
@@ -10,5 +10,5 @@ game:
 	              --env-threads=$(CEU_DIR)/env/threads.h                     \
 	              --env-main=$(CEU_DIR)/env/main.c                           \
 	        --cc --cc-args="-lm -llua5.3 -lpthread -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lSDL2_gfx" \
-	             --cc-output=/tmp/R2L.ceu;                                  \
-		/tmp/R2L.ceu;	                                                 \
+	             --cc-output=/tmp/R2L;                                  \
+		/tmp/R2L;	                                                 \

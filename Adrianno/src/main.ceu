@@ -2,10 +2,14 @@
 #include "c.ceu"
 #include "utils.ceu"
 
+#define _PRINTNOTHING(...); /*nada*/
+
 #define CEU_SDL_MODE_FRAME (1000/30)
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
+
+#define NUM_ZOMBIES 4000
 
 #define PI 3.1415926535897932
 
@@ -41,7 +45,11 @@ native/nohold
 native/const 
     _SDL_FLIP_NONE, 
     _SDL_FLIP_VERTICAL,
-	_SDL_DISABLE;
+	_SDL_DISABLE,
+	_SDL_SCANCODE_W,
+	_SDL_SCANCODE_A,
+	_SDL_SCANCODE_S,
+	_SDL_SCANCODE_D;
 
 
 var&? SDL_Init sdl = spawn SDL_Init("Right 2 Live", SCREEN_WIDTH, SCREEN_HEIGHT, SDL_Color(0x00,0x00,0x00,0xFF));
@@ -66,8 +74,6 @@ watching sdl do
 	var SDL_Rect camera = val SDL_Rect( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT );
 	
 	var u64 chaserID = 0;
-
-    #include "pathfinder.ceu"
 	
 	//MAP
 	#include "floorblock.ceu"
@@ -79,7 +85,7 @@ watching sdl do
 	var int i;
     var int j;
     var int w=1;
-    _printf("%d x %d with %d\n", _world_w, _world_h, _zombies_count);
+    _PRINTNOTHING("%d x %d with %d\n", _world_w, _world_h, _zombies_count);
 
 	chaserID = 0;
 	//WORLD GENERATION
@@ -141,7 +147,7 @@ watching sdl do
 	loop do
 
 		#include "deadzombie.ceu"
-		pool[100] DeadZombie corpses;
+		pool[NUM_ZOMBIES] DeadZombie corpses;
 
 		// SHOT
 		#include "shot.ceu"
@@ -156,15 +162,23 @@ watching sdl do
 									 _player_y * BLOCK_SIZE + (BLOCK_SIZE>>1));
 
 		var u64 kills = 0;
+		var u64 threadcount = 0;
+
+		#include "pathfinder.ceu"
 
 		// ZOMBIE 
 		
 		#include "zombie.ceu"
-		pool[50] Zombie zombies;
-		var int k;
+		pool[NUM_ZOMBIES] Zombie zombies;
+
+		loop i in [0 -> NUM_ZOMBIES[ do
+			var int spawnerid = _rand()%_zombies_count;
+			spawn Zombie(_zombies_x[spawnerid] * BLOCK_SIZE + (BLOCK_SIZE>>1), 
+						 _zombies_y[spawnerid] * BLOCK_SIZE + (BLOCK_SIZE>>1), 40 + (_rand()%100), 1) in zombies;
+		end
 		
-		code/await Spawner(var int x, var int y, var int offset) -> FOREVER do
-			var int interval = 5000;
+		/*code/await Spawner(var int x, var int y, var int offset) -> FOREVER do
+			var int interval = 500;
 			var float zhp = 1.0;
 			loop do
 				await (offset)ms;
@@ -180,7 +194,7 @@ watching sdl do
 		loop i in [0 -> _zombies_count[ do
 			spawn Spawner(_zombies_x[i] * BLOCK_SIZE + (BLOCK_SIZE>>1), 
 						 _zombies_y[i] * BLOCK_SIZE + (BLOCK_SIZE>>1), _rand()%2500) in spawners;
-		end
+		end*/
 
 		/*
 		var int i;	
@@ -220,9 +234,11 @@ watching sdl do
 		
 		//#include "map.ceu"
 		par/or do
-			every SDL_DT do
+			var int t;	
+			loop t in [0 -> 600] do
+				await SDL_DT;
 				//emit p.zombieTouch;
-				//_printf(" CAM %d, %d\n", p.playerOrigin_x as int, p.playerOrigin_y as int);
+				//_PRINTNOTHING(" CAM %d, %d\n", p.playerOrigin_x as int, p.playerOrigin_y as int);
 				// Mover a camera
 				camera.x = (p.playerOrigin_x - SCREEN_WIDTH/2) as int;
 				camera.y = (p.playerOrigin_y - SCREEN_HEIGHT/2) as int;
@@ -239,7 +255,7 @@ watching sdl do
 				if( camera.y > level_height - camera.h ) then
 					camera.y = level_height - camera.h;
 				end	
-				//_printf(" CAM %d, %d\n", camera.x as int, camera.y as int);
+				//_PRINTNOTHING(" CAM %d, %d\n", camera.x as int, camera.y as int);
 				
 				var&? Shot shot;
 				loop shot in shots do
@@ -260,6 +276,7 @@ watching sdl do
 				end
 				
 			end
+			_printf("Done\n");
 		with
 			loop do
 				await retracePaths;
@@ -280,11 +297,12 @@ watching sdl do
 
 		end
 		
-		_printf("Voce acabou com %lu zumbis.\n", kills);
-		_printf("clique na tela para continuar\n");
-		var _SDL_MouseButtonEvent&& mb;
-		mb = await SDL_MOUSEBUTTONDOWN until mb:button == _SDL_BUTTON_LEFT;
-	
+		_PRINTNOTHING("Voce acabou com %lu zumbis.\n", kills);
+		_PRINTNOTHING("clique na tela para continuar\n");
+		
+		//var _SDL_MouseButtonEvent&& mb;
+		//mb = await SDL_MOUSEBUTTONDOWN until mb:button == _SDL_BUTTON_LEFT;
+		break;
 	end
 	
 end

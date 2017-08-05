@@ -81,7 +81,7 @@ code/await DeadZombie(var int x, var int y, var int angle) -> void do
 		end	
 	end
 	
-	//_printf("BYEEEEEE\n");
+	//_PRINTNOTHING("BYEEEEEE\n");
 	//emit outer.p.zombieDeath;
 
 end

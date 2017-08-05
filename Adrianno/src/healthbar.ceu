@@ -30,7 +30,7 @@ code/await HealthHUD(void) -> (event int health, var SDL_Rect bar, var SDL_Rect 
 	
 	loop do
 		h = await health;
-		_printf("------------%d\n",h);
+		_PRINTNOTHING("------------%d\n",h);
 		if(h < 40) then
 			r = 0xFF;
 			g = 0x00;
